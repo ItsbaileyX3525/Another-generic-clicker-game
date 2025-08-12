@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game</title>
+</head>
+<body>
+<script src="/taptapir/taptapir.js"></script>
+<script type="text/sunsnake">
+
+set_orientation('horizontal')
+print("Hello world")
+set_window_color('rgb(23,23,23)')
+
+startScreenElements = []
+
+gameTitle = Text(text = 'Another clicker game',y=.4, text_color = color.white)
+gameTitle.fit_to_text()
+gameStart = Button(text = 'START GAME', text_color=color.white, color=color.black, scale_y=.2,scale_x = .5)
+gameStart.on_click = def():
+    gameStart.animate('scale_x', .4, duration=.03)
+    gameStart.animate('scale_y', .18, duration=.03)
+    after .2:
+        gameStart.animate('scale_x', .5, duration=.05)
+        gameStart.animate('scale_y', .2, duration=.05)
+        for e in startScreenElements:
+            e.enabled = false
+
+infoButton = Button(text = 'What game engine is this?', scale_x = .4, scale_y = .1, text_size = 1.6, y=-.4, text_color = color.light_gray, color=color.dark_gray)
+
+
+startScreenElements.append(gameTitle)
+startScreenElements.append(gameStart)
+
+</script><script src="/taptapir/sunsnake_compiler.js"></script>
+</body>

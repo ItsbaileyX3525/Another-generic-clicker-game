@@ -107,7 +107,6 @@ function set_orientation(value) {
 // set_orientation
 function set_aspect_ratio(_aspect_ratio) {
     ASPECT_RATIO = _aspect_ratio
-    print('set aspect ratio to:', _aspect_ratio)
     var width = window.innerWidth
     var height = window.innerHeight
     browser_aspect_ratio = width / height
@@ -117,14 +116,11 @@ function set_aspect_ratio(_aspect_ratio) {
         asp_x = 1
         asp_y = ASPECT_RATIO
         aspect_ratio = 1/ASPECT_RATIO
-        print(browser_aspect_ratio, aspect_ratio)
         if (browser_aspect_ratio > ASPECT_RATIO) { // if the screen is wider than the game, like a pc monitor.
-            print('vertical view on wide screen (probably pc)')
             _game_window.style.width = `${width*scale/browser_aspect_ratio*ASPECT_RATIO}px`
             _game_window.style.height =  `${height*scale}px`
         }
         else {                              // if the screen is taller than the game, like a phone screen.
-            print('vertical view on talls screen (probably mobile)', width, width/ASPECT_RATIO, height)
             _game_window.style.height = `${width/ASPECT_RATIO*scale}px`
             _game_window.style.width =  `${width*scale}px`
         }
@@ -588,7 +584,6 @@ class Entity {
             if (!name.includes('.')) {
                 var jpg_image = new Image();
                 jpg_image.onload = () => {
-                    print(`${name}.jpg exists`)
                     this.texture = `${name}.jpg`
                     return
                 }
@@ -1309,7 +1304,6 @@ function _handle_mouse_click(e) {
                 mouse.click_animation_entity.xy = mouse.position
                 mouse.click_animation_entity.enabled = True
                 mouse.click_animation_entity.texture = mouse.click_animation
-                print('play click anim')
             }
         }
         if (entity.draggable) {
@@ -1464,7 +1458,6 @@ mouse.update = () => {      // simulate pointermove. can for example be used to 
 //
 // }
 function Video(options) {
-    print('----------------------', options)
     settings = {visible_self:false, on_enter:null, on_exit:null, enabled:false, texture:null}
     for (const [key, value] of Object.entries(options)) {
         settings[key] = value

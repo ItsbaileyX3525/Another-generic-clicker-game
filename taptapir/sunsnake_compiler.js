@@ -110,7 +110,6 @@ function compile(script) {
 
         if (all_lines[i].startsWith('class ')) {
           class_name = all_lines[i].slice(6).split(' ')[0].split('(')[0].split(':')[0]
-          print('found class:', class_name)
             _class_names.push(class_name)
         }
 
@@ -482,7 +481,7 @@ function int(value) {
 }
 
 function Array_2d(w, h, default_value=0) {
-    print('deprecated: Array_2d. Use Array2D')
+    //print('deprecated: Array_2d. Use Array2D')
     var tiles = new Array(w)
     for (var i = 0; i < tiles.length; i++) {
         tiles[i] = new Array(h);
@@ -642,7 +641,6 @@ else {
 
 for (var script of scripts) {
     if (script.type == 'text/sunsnake') {
-        print('compile:', script)
         if (script.textContent) {   // inline script content
             compiled_code = compile(script.textContent)
             eval(compiled_code)
@@ -668,7 +666,6 @@ for (var script of scripts) {
 }
 
 async function __import__(url) {
-    console.log('importing:', url);
     if (!url.includes('.')) {
         url = url + '.sunsnake';
     }

@@ -1,21 +1,143 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game</title>
+    <title>AGCG</title>
 </head>
-<body>
-<script src="/taptapir/taptapir.js"></script>
+
+<body style="background-color: black;">
+<script>
+let backgroundMusic = new Audio('/assets/DanTDM - Spacedog.mp3')
+backgroundMusic.volume = .4
+class GameLogic {
+    constructor(data) {
+        if (data) {
+            data = JSON.parse(data)
+            this.milestones = data["milestones"]
+            this.upgrades = data["upgrades"]
+            this.score = parseInt(data["score"],10);
+            this.generateAmount = parseInt(data["generateAmount"],10)
+            this.clicks = parseInt(data["clicks"],10)
+            setInterval(() => this.generateScore(), 1000);
+            setInterval(() => this.saveGame(), 2500);
+        } else { //First time playing or they deleted their data or summin
+            this.milestones = {
+                "achieved50Clicks" : false,
+            }
+            this.upgrades = {}
+            this.score = 0
+            this.generateAmount = 0
+            this.clicks = 0
+            setInterval(() => this.generateScore(), 1000);
+            setInterval(() => this.saveGame(), 2500);
+        }
+
+    }
+
+    get clicks() {
+        return this._clicks
+    }
+
+    set clicks(newval) {
+        this._clicks = parseInt(newval,10)
+        if (this.clicks >= 50 && !this.milestones["achieved50Clicks"]) {
+            this.milestones["achieved50Clicks"] = true
+            window.clicks50()
+        }
+    }
+
+    get score() {
+        return this._score;
+    }
+
+    set score(newval) {
+        this._score = parseInt(newval,10)
+    }
+
+    purchaseUpgrade = (upgrade, el) => {
+        if (this.score >= parseInt(this.upgrades[upgrade][0],10)) {
+            this.upgrades[upgrade][1] = true
+            this.score -= parseInt(this.upgrades[upgrade][0],10)
+            destroy(el)
+            return true
+        } else {
+            return false
+        }
+    }
+
+    addScore = (newScore) => {
+        this.score += newScore
+    }
+
+    generateScore = () => {
+        this.addScore(this.generateAmount)
+    }
+
+    saveGame = () => {
+        const save = {
+            "score": this.score,
+            "generateAmount": this.generateAmount,
+            "clicks" : this.clicks,
+            "milestones" : this.milestones,
+            "upgrades" : this.upgrades,
+        }
+        console.log("Saved")
+        localStorage.setItem('gameData', JSON.stringify(save))
+    }
+}
+
+const data = localStorage.getItem('gameData') || null
+
+let game = new GameLogic(data)
+
+function addHover(el, description, cost) {
+    print("Added hover")
+    el.addEventListener('mouseenter', () => {
+        mouseTooltip.text = description + "\n<center>" + "Cost: " + cost + "</center>"
+        mouseTooltip.enabled = true
+    })
+    el.addEventListener('mouseleave', () => {
+        mouseTooltip.text = ""
+        mouseTooltip.enabled = false
+    })
+}
+
+function removeHover(el) {
+    mouseTooltip.text = ""
+    mouseTooltip.enabled = false
+    el.removeEventListener('mouseenter')
+    el.removeEventListener('mouseleave')
+}
+</script>
+<script src="/taptapir/taptapir.js">
+</script>
 <script type="text/sunsnake">
 
 set_orientation('horizontal')
 print("Hello world")
 set_window_color('rgb(23,23,23)')
+ASSETS_FOLDER = '/assets/'
 
 startScreenElements = []
+infoScreenElements = []
+mainGameElements = []
+activeUpgrades = []
 
-gameTitle = Text(text = 'Another clicker game',y=.4, text_color = color.white)
+######## Main menu stuff ############
+
+def loadScreen(name): #Debuggin
+    for e in startScreenElements:
+        e.enabled = false
+    if name == "info":
+        for e in infoScreenElements:
+            e.enabled = true
+    if name == "game":
+        for e in mainGameElements:
+            e.enabled = true 
+
+gameTitle = Text(text = 'Another generic clicker game',y=.4, text_color = color.white)
 gameTitle.fit_to_text()
 gameStart = Button(text = 'START GAME', text_color=color.white, color=color.black, scale_y=.2,scale_x = .5)
 gameStart.on_click = def():
@@ -26,12 +148,101 @@ gameStart.on_click = def():
         gameStart.animate('scale_y', .2, duration=.05)
         for e in startScreenElements:
             e.enabled = false
+        for e in mainGameElements:
+            e.enabled = true
+        backgroundMusic.play()
 
 infoButton = Button(text = 'What game engine is this?', scale_x = .4, scale_y = .1, text_size = 1.6, y=-.4, text_color = color.light_gray, color=color.dark_gray)
+infoButton.on_click = def():
+    for e in startScreenElements:
+        e.enabled = false 
+    for e in infoScreenElements:
+        e.enabled = true
 
+infoScreenBG = Entity(color=color.light_gray, scale_x=2, scale_y=2, enabled = false)
+infoText = Text(text = 'The game engine is called taptapir, it is a game engine that was created by <a style="color: salmon;" target="_blank" href="https://github.com/pokepetter/">Pokepetter</a>\nPokepetter created the taptapir engine as a method for building mobile games in a way\nthat felt like you were still using ursina\n\nFor that reason I fell in love with taptapir and used it in my early development life as I\ndidn\'t know any other methods to build for mobile at the time (I was a new dev)\nso thank you Poke for creating taptapir', x=-.47, enabled = false, text_size=2.4, enabled = false)
+infoReturn = Button(text = 'RETURN', scale_x=.5, scale_y=.15, y=-.19, enabled = false)
+infoReturn.on_click = def():
+    for e in startScreenElements:
+        e.enabled = true
+    for e in infoScreenElements:
+        e.enabled = false
 
 startScreenElements.append(gameTitle)
 startScreenElements.append(gameStart)
+startScreenElements.append(infoButton)
 
-</script><script src="/taptapir/sunsnake_compiler.js"></script>
+infoScreenElements.append(infoText)
+infoScreenElements.append(infoScreenBG)
+infoScreenElements.append(infoReturn)
+
+
+########## Clicker game stuff ###########
+
+def addUpgrade(upgrade, description, cost):
+    if activeUpgrades.length >= 3:
+        print("Too big")
+
+    for e in activeUpgrades:
+        e.x-=.13 
+
+    b = Button(text=upgrade, text_size=1.3, color=color.black, text_color=color.white, scale=.125,y=-.11,x=0)
+    b.on_click = def():
+        game.purchaseUpgrade(upgrade, b)
+        removeHover(b.el)
+    
+    addHover(b.el,description,cost)
+
+
+    activeUpgrades.append(b)
+
+def clicks50():
+    game.upgrades["clickAnim"] = [50, false, "Add a cool click animation"]
+    addUpgrade("clickAnim", game.upgrades["clickAnim"][2], game.upgrades["clickAnim"][0])
+
+mouseTooltip = Text(enabled = false, text_color=color.white,text = 'description of what\nthe button does\n<center>Cost: 50</center>', text_size=2.4, color=color.black)
+mouseTooltip.fit_to_text()
+mouseTooltip.update = def():
+    mouseTooltip.x = mouse.x +.21
+    mouseTooltip.y = mouse.y +.08
+
+saveGameButton = Button(texture = 'save.svg', y=.3, scale = .12, color=color.gray, y=.43,x=.8, enabled=false)
+saveGameButton.on_click = def():
+    if not saveGameButton.disabled:
+        saveGameButton.disabled = true
+        game.saveGame()
+        after .6:
+            saveGameButton.disabled = false
+
+scoreText = Text(text = 'Clicks: 0', text_color=color.light_gray, y=.43, enabled=false)
+scoreText.fit_to_text()
+scoreText.update = def():
+    scoreText.text = 'Clicks: ' + String(game.score)
+
+clickToEarn = Button(y=.07,enabled = false)  
+clickToEarn.on_click = def():
+    if Object.hasOwn(game.upgrades, "clickAnim") and game.upgrades["clickAnim"][1]:
+        clickToEarn.scale=.22
+        clickToEarn.animate('scale_x', .2, duration=.1)
+        clickToEarn.animate('scale_y', .2, duration=.1)
+        game.score += 2
+    else:
+        game.score += 1
+    
+    game.clicks += 1
+
+
+mainGameElements.append(clickToEarn)
+mainGameElements.append(scoreText)
+mainGameElements.append(saveGameButton)
+
+for ([key, value] of Object.entries(game.upgrades)):
+    if not value[1]:
+        addUpgrade(key, value[2], value[0])
+
+#addUpgrade("test", "This is a test upgrade", 5)
+
+loadScreen("game")
+</script>
+    <script src="/taptapir/sunsnake_compiler.js"></script>
 </body>

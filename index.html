@@ -9,14 +9,27 @@
 
 <body style="background-color: black;">
 <script>
+function clickSound() {
+    let click = new Audio('/assets/Click.mp3')
+    click.play()
+    click.volume = .4
+    click.addEventListener('ended', () => {
+        click.pause()
+        click = null
+    })
+}
+
 let backgroundMusic = new Audio('/assets/DanTDM - Spacedog.mp3')
 backgroundMusic.volume = .4
 class GameLogic {
     constructor(data) {
+        this.firstLoadClicks = true
+        this.firstLoadScore = true
         if (data) {
             data = JSON.parse(data)
             this.milestones = data["milestones"]
             this.upgrades = data["upgrades"]
+            this.totalScore = parseInt(data["totalScore"],10)
             this.score = parseInt(data["score"],10);
             this.generateAmount = parseInt(data["generateAmount"],10)
             this.clicks = parseInt(data["clicks"],10)
@@ -30,6 +43,7 @@ class GameLogic {
             this.score = 0
             this.generateAmount = 0
             this.clicks = 0
+            this.totalScore = 0
             setInterval(() => this.generateScore(), 1000);
             setInterval(() => this.saveGame(), 2500);
         }
@@ -42,6 +56,11 @@ class GameLogic {
 
     set clicks(newval) {
         this._clicks = parseInt(newval,10)
+        if (this.firstLoadClicks) {this.firstLoadClicks=false;return}
+        if (this.clicks >= 10 && !this.milestones["achieved10Clicks"]) {
+            this.milestones["achieved10Clicks"] = true
+            window.clicks10()
+        }
         if (this.clicks >= 50 && !this.milestones["achieved50Clicks"]) {
             this.milestones["achieved50Clicks"] = true
             window.clicks50()
@@ -54,13 +73,43 @@ class GameLogic {
 
     set score(newval) {
         this._score = parseInt(newval,10)
+        if (this.firstLoadScore) {this.firstLoadScore=false;return}
+        this.totalScore += newval
+        if (this.score >= 150 && !this.milestones["achieved150Score"]) {
+            this.milestones["achieved150Score"] = true
+            window.score150()
+        }
+        if (this.score >= 500 && !this.milestones["achieved500Score"]) {
+            this.milestones["achieved500Score"] = true
+            window.score500()
+        }
     }
 
     purchaseUpgrade = (upgrade, el) => {
         if (this.score >= parseInt(this.upgrades[upgrade][0],10)) {
             this.upgrades[upgrade][1] = true
             this.score -= parseInt(this.upgrades[upgrade][0],10)
+            let index = activeUpgrades.indexOf(el)
+            if (index !== -1) {
+                console.log("Found active upgrade, removing")
+                activeUpgrades.splice(index, 1)
+            } else {
+                console.log("error with index")
+            }
             destroy(el)
+            if (activeUpgrades.length >= 1){
+                for (let e of activeUpgrades) {
+                    e.x += 0.13
+                }
+            }
+            if (storedUpgrades.length >= 1) {
+                console.log("Found stored upgrade, adding")
+                console.log(storedUpgrades)
+                addUpgrade(storedUpgrades[0][0],storedUpgrades[0][1],storedUpgrades[0][2])
+                storedUpgrades.shift()
+            }
+            loadUpgrades()
+            removeHover(el)
             return true
         } else {
             return false
@@ -82,6 +131,7 @@ class GameLogic {
             "clicks" : this.clicks,
             "milestones" : this.milestones,
             "upgrades" : this.upgrades,
+            "totalScore" : this.totalScore,
         }
         console.log("Saved")
         localStorage.setItem('gameData', JSON.stringify(save))
@@ -90,25 +140,40 @@ class GameLogic {
 
 const data = localStorage.getItem('gameData') || null
 
-let game = new GameLogic(data)
+
+function onEnter(el, description, cost, event) {
+	mouseTooltip.text = description + "\n<center>" + "Cost: " + cost + "</center>";
+	mouseTooltip.enabled = true;
+}
+
+function onLeave(event) {
+	mouseTooltip.text = "";
+	mouseTooltip.enabled = false;
+}
 
 function addHover(el, description, cost) {
-    print("Added hover")
-    el.addEventListener('mouseenter', () => {
-        mouseTooltip.text = description + "\n<center>" + "Cost: " + cost + "</center>"
-        mouseTooltip.enabled = true
-    })
-    el.addEventListener('mouseleave', () => {
-        mouseTooltip.text = ""
-        mouseTooltip.enabled = false
-    })
+	console.log("Added hover");
+
+	el._boundEnter = onEnter.bind(null, el, description, cost);
+	el._boundLeave = onLeave.bind(null);
+
+	el.addEventListener('mouseenter', el._boundEnter);
+	el.addEventListener('mouseleave', el._boundLeave);
 }
 
 function removeHover(el) {
-    mouseTooltip.text = ""
-    mouseTooltip.enabled = false
-    el.removeEventListener('mouseenter')
-    el.removeEventListener('mouseleave')
+	mouseTooltip.text = "";
+	mouseTooltip.enabled = false;
+
+	if (el._boundEnter) {
+		el.removeEventListener('mouseenter', el._boundEnter);
+		delete el._boundEnter;
+	}
+
+	if (el._boundLeave) {
+		el.removeEventListener('mouseleave', el._boundLeave);
+		delete el._boundLeave;
+	}
 }
 </script>
 <script src="/taptapir/taptapir.js">
@@ -124,6 +189,7 @@ startScreenElements = []
 infoScreenElements = []
 mainGameElements = []
 activeUpgrades = []
+storedUpgrades = []
 
 ######## Main menu stuff ############
 
@@ -151,7 +217,11 @@ gameStart.on_click = def():
         for e in mainGameElements:
             e.enabled = true
         backgroundMusic.play()
-
+        for ([key, value] of Object.entries(game.upgrades)):
+            if not value[1]:
+                addUpgrade(key, value[2], value[0])
+        loadUpgrades()
+        
 infoButton = Button(text = 'What game engine is this?', scale_x = .4, scale_y = .1, text_size = 1.6, y=-.4, text_color = color.light_gray, color=color.dark_gray)
 infoButton.on_click = def():
     for e in startScreenElements:
@@ -179,9 +249,38 @@ infoScreenElements.append(infoReturn)
 
 ########## Clicker game stuff ###########
 
+def clicks10():
+    game.upgrades["scoreDisplay"] = [10, false, "See how much clicks you have"]
+    addUpgrade("scoreDisplay", game.upgrades["scoreDisplay"][2], game.upgrades["scoreDisplay"][0])
+
+
+def clicks50():
+    game.upgrades["clickAnim"] = [50, false, "Add a cool click animation"]
+    addUpgrade("clickAnim", game.upgrades["clickAnim"][2], game.upgrades["clickAnim"][0])
+
+def score150():
+    game.upgrades["generators"] = [250, false, "Unlock some automation"]
+    addUpgrade("generators", game.upgrades["generators"][2], game.upgrades["generators"][0])
+
+def score500():
+    game.upgrades["save"] = [750, false, "Unlock some automation"]
+    addUpgrade("save", game.upgrades["save"][2], game.upgrades["save"][0])
+
+
+def loadUpgrades():
+    if game.upgrades["scoreDisplay"] and game.upgrades["scoreDisplay"][1]:
+        scoreText.enabled = true
+        mainGameElements.append(scoreText)
+    if game.upgrades["save"] and game.upgrades["save"][1]:
+        saveGameButton.enabled = true
+        mainGameElements.append(saveGameButton)
+
 def addUpgrade(upgrade, description, cost):
-    if activeUpgrades.length >= 3:
-        print("Too big")
+    if activeUpgrades.length >= 1:
+        upgrade = [upgrade, description, cost]
+        storedUpgrades.append(upgrade)
+        print("Appended upgrade")
+        return
 
     for e in activeUpgrades:
         e.x-=.13 
@@ -189,16 +288,11 @@ def addUpgrade(upgrade, description, cost):
     b = Button(text=upgrade, text_size=1.3, color=color.black, text_color=color.white, scale=.125,y=-.11,x=0)
     b.on_click = def():
         game.purchaseUpgrade(upgrade, b)
-        removeHover(b.el)
     
     addHover(b.el,description,cost)
 
 
     activeUpgrades.append(b)
-
-def clicks50():
-    game.upgrades["clickAnim"] = [50, false, "Add a cool click animation"]
-    addUpgrade("clickAnim", game.upgrades["clickAnim"][2], game.upgrades["clickAnim"][0])
 
 mouseTooltip = Text(enabled = false, text_color=color.white,text = 'description of what\nthe button does\n<center>Cost: 50</center>', text_size=2.4, color=color.black)
 mouseTooltip.fit_to_text()
@@ -213,6 +307,13 @@ saveGameButton.on_click = def():
         game.saveGame()
         after .6:
             saveGameButton.disabled = false
+        
+        t = Text(text='Game saved successfully', text_color=color.green,y=-.44,x=.02)
+        t.fit_to_text()
+        t.animate("y", -.32, duartion=.4)
+
+        after .6:
+            destroy(t)
 
 scoreText = Text(text = 'Clicks: 0', text_color=color.light_gray, y=.43, enabled=false)
 scoreText.fit_to_text()
@@ -221,6 +322,7 @@ scoreText.update = def():
 
 clickToEarn = Button(y=.07,enabled = false)  
 clickToEarn.on_click = def():
+    clickSound()
     if Object.hasOwn(game.upgrades, "clickAnim") and game.upgrades["clickAnim"][1]:
         clickToEarn.scale=.22
         clickToEarn.animate('scale_x', .2, duration=.1)
@@ -233,16 +335,9 @@ clickToEarn.on_click = def():
 
 
 mainGameElements.append(clickToEarn)
-mainGameElements.append(scoreText)
-mainGameElements.append(saveGameButton)
+game = new GameLogic(data)
 
-for ([key, value] of Object.entries(game.upgrades)):
-    if not value[1]:
-        addUpgrade(key, value[2], value[0])
-
-#addUpgrade("test", "This is a test upgrade", 5)
-
-loadScreen("game")
+#loadScreen("game")
 </script>
     <script src="/taptapir/sunsnake_compiler.js"></script>
 </body>

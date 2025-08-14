@@ -21,6 +21,30 @@ function clickSound() {
 
 let backgroundMusic = new Audio('/assets/DanTDM - Spacedog.mp3')
 backgroundMusic.volume = .4
+
+let saveGameSFX = new Audio('/assets/save.mp3')
+let purchaseUpgradeSFX = new Audio('/assets/purchase.mp3')
+let purchaseUpgradeFailSFX = new Audio('/assets/purchaseFail.mp3')
+
+// Format large numbers to human-readable form (e.g., 1.2k, 3.4M) with up to 1 decimal place.
+function formatNumber(value) {
+    if (value === null || value === undefined) return '0';
+    const num = Number(value);
+    if (!isFinite(num)) return '0';
+    if (Math.abs(num) < 1000) return num.toString();
+    const units = ['', 'k', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc'];
+    let unitIndex = 0;
+    let scaled = num;
+    while (Math.abs(scaled) >= 1000 && unitIndex < units.length - 1) {
+        scaled /= 1000;
+        unitIndex++;
+    }
+    let str = scaled.toFixed(1);
+    if (str.endsWith('.0')) str = str.slice(0, -2);
+    return str + units[unitIndex];
+}
+window.formatNumber = formatNumber;
+
 class GameLogic {
     constructor(data) {
         this.firstLoadClicks = true
@@ -31,10 +55,24 @@ class GameLogic {
             this.upgrades = data["upgrades"]
             this.totalScore = parseInt(data["totalScore"],10)
             this.score = parseInt(data["score"],10);
-            this.generateAmount = parseInt(data["generateAmount"],10)
             this.clicks = parseInt(data["clicks"],10)
-            setInterval(() => this.generateScore(), 1000);
-            setInterval(() => this.saveGame(), 2500);
+            this.generatorData = data["generatorData"] || {}
+            this.generateAmount = 0
+            for (let value of Object.values(this.generatorData)) {
+                //value structure: [amount bought, price, total earn]
+                this.generateAmount += value[2]
+            }
+            if (!window._genIntervalSet) {
+                window._genIntervalSet = true
+                setInterval(() => {
+                    this.generateScore();
+                }, 1000);
+            }
+            if (!window._saveIntervalSet) {
+                window._saveIntervalSet = true
+                setInterval(() => this.saveGame(), 2500);
+            }
+            console.log('[GameLogic] Loaded. generateAmount =', this.generateAmount, 'generatorData =', this.generatorData)
         } else { //First time playing or they deleted their data or summin
             this.milestones = {
                 "achieved50Clicks" : false,
@@ -44,8 +82,16 @@ class GameLogic {
             this.generateAmount = 0
             this.clicks = 0
             this.totalScore = 0
-            setInterval(() => this.generateScore(), 1000);
-            setInterval(() => this.saveGame(), 2500);
+            this.generatorData = {}
+            if (!window._genIntervalSet) {
+                window._genIntervalSet = true
+                setInterval(() => this.generateScore(), 1000);
+            }
+            if (!window._saveIntervalSet) {
+                window._saveIntervalSet = true
+                setInterval(() => this.saveGame(), 2500);
+            }
+            console.log('[GameLogic] Fresh start.')
         }
 
     }
@@ -83,6 +129,23 @@ class GameLogic {
             this.milestones["achieved500Score"] = true
             window.score500()
         }
+        if (this.score >= 800 && !this.milestones["achieved800Score"]) {
+            this.milestones["achieved800Score"] = true
+            window.score800()
+        }
+        if (this.score >= 1200 && !this.milestones["achieved1200Score"]) {
+            this.milestones["achieved1200Score"] = true
+            window.score1200()
+        }
+        
+    }
+
+    get generateAmount() {
+        return this._generateAmount
+    }
+
+    set generateAmount(newval) {
+        this._generateAmount = newval
     }
 
     purchaseUpgrade = (upgrade, el) => {
@@ -110,9 +173,37 @@ class GameLogic {
             }
             loadUpgrades()
             removeHover(el)
+            purchaseUpgradeSFX.play()
             return true
         } else {
+            purchaseUpgradeFailSFX.play()
             return false
+        }
+    }
+
+    buyGen(gen, genPrice, genEarn, genName) {
+        if (this.score >= genPrice) {
+            //Success
+            this.score -= genPrice;
+
+            const newPrice = Math.floor(genPrice * 1.25);
+            gen.cost = newPrice;
+
+            this.generateAmount += genEarn;
+
+            if (!this.generatorData[genName]) {
+                this.generatorData[genName] = [0, 0, 0]; // [amount bought, current price, total earn]
+            }
+            this.generatorData[genName][0] += 1; // amount bought
+            this.generatorData[genName][1] = newPrice; // store updated price
+            this.generatorData[genName][2] += genEarn; // cumulative earn per second contributed
+
+            gen.text = `Generate ${formatNumber(genEarn)} clicks a second\nCost: ${formatNumber(newPrice)} clicks`;
+            return true;
+        } else {
+            print("Broke boy");
+            //Failure sound effect
+            return false;
         }
     }
 
@@ -132,6 +223,7 @@ class GameLogic {
             "milestones" : this.milestones,
             "upgrades" : this.upgrades,
             "totalScore" : this.totalScore,
+            "generatorData" : this.generatorData
         }
         console.log("Saved")
         localStorage.setItem('gameData', JSON.stringify(save))
@@ -142,8 +234,8 @@ const data = localStorage.getItem('gameData') || null
 
 
 function onEnter(el, description, cost, event) {
-	mouseTooltip.text = description + "\n<center>" + "Cost: " + cost + "</center>";
-	mouseTooltip.enabled = true;
+    mouseTooltip.text = description + "\n<center>Cost: " + formatNumber(cost) + "</center>";
+    mouseTooltip.enabled = true;
 }
 
 function onLeave(event) {
@@ -154,7 +246,7 @@ function onLeave(event) {
 function addHover(el, description, cost) {
 	console.log("Added hover");
 
-	el._boundEnter = onEnter.bind(null, el, description, cost);
+    el._boundEnter = onEnter.bind(null, el, description, cost);
 	el._boundLeave = onLeave.bind(null);
 
 	el.addEventListener('mouseenter', el._boundEnter);
@@ -188,6 +280,7 @@ ASSETS_FOLDER = '/assets/'
 startScreenElements = []
 infoScreenElements = []
 mainGameElements = []
+generatorElements = []
 activeUpgrades = []
 storedUpgrades = []
 
@@ -214,15 +307,25 @@ gameStart.on_click = def():
         gameStart.animate('scale_y', .2, duration=.05)
         for e in startScreenElements:
             e.enabled = false
-        for e in mainGameElements:
-            e.enabled = true
-        backgroundMusic.play()
-        for ([key, value] of Object.entries(game.upgrades)):
-            if not value[1]:
-                addUpgrade(key, value[2], value[0])
-        loadUpgrades()
-        
-infoButton = Button(text = 'What game engine is this?', scale_x = .4, scale_y = .1, text_size = 1.6, y=-.4, text_color = color.light_gray, color=color.dark_gray)
+        after .01:
+            for e in mainGameElements:
+                e.enabled = true
+                backgroundMusic.play()
+            for ([key, value] of Object.entries(game.upgrades)) {
+
+                    if not value[1]:
+                        addUpgrade(key, value[2], value[0])
+            loadUpgrades()
+            loadGenerators()
+
+eraseData = Button(text='Erase save',padding=.3,text_size=2.5,y=-.22)
+eraseData.fit_to_text()
+eraseData.on_click = def():
+    localStorage.clear()
+    window.location.reload()
+
+infoButton = Button(text = 'What game engine is this?',padding=1, scale_x = .4, scale_y = .1, text_size = 1.6, y=-.4, text_color = color.light_gray, color=color.dark_gray)
+infoButton.fit_to_text()
 infoButton.on_click = def():
     for e in startScreenElements:
         e.enabled = false 
@@ -230,7 +333,8 @@ infoButton.on_click = def():
         e.enabled = true
 
 infoScreenBG = Entity(color=color.light_gray, scale_x=2, scale_y=2, enabled = false)
-infoText = Text(text = 'The game engine is called taptapir, it is a game engine that was created by <a style="color: salmon;" target="_blank" href="https://github.com/pokepetter/">Pokepetter</a>\nPokepetter created the taptapir engine as a method for building mobile games in a way\nthat felt like you were still using ursina\n\nFor that reason I fell in love with taptapir and used it in my early development life as I\ndidn\'t know any other methods to build for mobile at the time (I was a new dev)\nso thank you Poke for creating taptapir', x=-.47, enabled = false, text_size=2.4, enabled = false)
+infoText = Text(y=.3,x=0,text = 'The game engine is called taptapir, it is a game engine that was created by <a style="color: salmon;" target="_blank" href="https://github.com/pokepetter/">Pokepetter</a>\nPokepetter created the taptapir engine as a method for building mobile games in a way\nthat felt like you were still using ursina\n\nFor that reason I fell in love with taptapir and used it in my early development life as I\ndidn\'t know any other methods to build for mobile at the time (I was a new dev)\nso thank you Poke for creating taptapir', enabled = false, text_size=2, enabled = false)
+infoText.fit_to_text()
 infoReturn = Button(text = 'RETURN', scale_x=.5, scale_y=.15, y=-.19, enabled = false)
 infoReturn.on_click = def():
     for e in startScreenElements:
@@ -241,6 +345,7 @@ infoReturn.on_click = def():
 startScreenElements.append(gameTitle)
 startScreenElements.append(gameStart)
 startScreenElements.append(infoButton)
+startScreenElements.append(eraseData)
 
 infoScreenElements.append(infoText)
 infoScreenElements.append(infoScreenBG)
@@ -263,8 +368,16 @@ def score150():
     addUpgrade("generators", game.upgrades["generators"][2], game.upgrades["generators"][0])
 
 def score500():
-    game.upgrades["save"] = [750, false, "Unlock some automation"]
+    game.upgrades["save"] = [750, false, "Save your game whenever\nyou want!"]
     addUpgrade("save", game.upgrades["save"][2], game.upgrades["save"][0])
+
+def score800():
+    game.upgrades["background"] = [1000, false, "Add a nice background to\nthe game"]
+    addUpgrade("background", game.upgrades["background"][2], game.upgrades["background"][0])
+
+def score1200():
+    game.upgrades["removeBackground"] = [1500, false, "Create a button to turn\noff the background!"]
+    addUpgrade("removeBackground", game.upgrades["removeBackground"][2], game.upgrades["removeBackground"][0])
 
 
 def loadUpgrades():
@@ -274,12 +387,26 @@ def loadUpgrades():
     if game.upgrades["save"] and game.upgrades["save"][1]:
         saveGameButton.enabled = true
         mainGameElements.append(saveGameButton)
+    if game.upgrades["generators"] and game.upgrades["generators"][1]:
+        generatorButton.enabled = true
+        mainGameElements.append(generatorButton)
+    if game.upgrades['background'] and game.upgrades['background'][1]:
+        if localStorage.getItem('backgroundEnabled') === 'true':
+            background.enabled = true
+        mainGameElements.append(background)
+    if game.upgrades['removeBackground'] and game.upgrades['removeBackground'][1]:
+        backgroundToggle.enabled = true
+        if localStorage.getItem('backgroundEnabled') === 'true':
+            backgroundToggle.texture = 'bgEnabled.svg'
+        else:
+            backgroundToggle.texture = 'bgDisabled.svg'
+        backgroundToggle.color = color.gray
+        mainGameElements.append(backgroundToggle)
 
 def addUpgrade(upgrade, description, cost):
     if activeUpgrades.length >= 1:
         upgrade = [upgrade, description, cost]
         storedUpgrades.append(upgrade)
-        print("Appended upgrade")
         return
 
     for e in activeUpgrades:
@@ -294,17 +421,20 @@ def addUpgrade(upgrade, description, cost):
 
     activeUpgrades.append(b)
 
-mouseTooltip = Text(enabled = false, text_color=color.white,text = 'description of what\nthe button does\n<center>Cost: 50</center>', text_size=2.4, color=color.black)
+mouseTooltip = Text(enabled = false, text_color=color.white,text = 'description of what\nthe button does\n<center>Cost: 50</center>', text_size=2, color=color.black)
 mouseTooltip.fit_to_text()
 mouseTooltip.update = def():
-    mouseTooltip.x = mouse.x +.21
+    mouseTooltip.x = mouse.x +.25
     mouseTooltip.y = mouse.y +.08
+    mouseTooltip.fit_to_text()
 
 saveGameButton = Button(texture = 'save.svg', y=.3, scale = .12, color=color.gray, y=.43,x=.8, enabled=false)
 saveGameButton.on_click = def():
     if not saveGameButton.disabled:
         saveGameButton.disabled = true
         game.saveGame()
+        saveGameSFX.currentTime = 0
+        saveGameSFX.play()
         after .6:
             saveGameButton.disabled = false
         
@@ -318,7 +448,7 @@ saveGameButton.on_click = def():
 scoreText = Text(text = 'Clicks: 0', text_color=color.light_gray, y=.43, enabled=false)
 scoreText.fit_to_text()
 scoreText.update = def():
-    scoreText.text = 'Clicks: ' + String(game.score)
+    scoreText.text = 'Clicks: ' + formatNumber(game.score)
 
 clickToEarn = Button(y=.07,enabled = false)  
 clickToEarn.on_click = def():
@@ -333,8 +463,118 @@ clickToEarn.on_click = def():
     
     game.clicks += 1
 
+generatorButton = Button(text = "Generators", x=.67, padding=.6, text_color=color.white, color=color.black, enabled = false)
+generatorButton.on_click = def():
+    for e in mainGameElements:
+        e.enabled = false
+    for e in generatorElements:
+        e.enabled = true
+
+generatorButton.fit_to_text()
+
+backgroundToggle = Button(scale=.15,enabled=false,texture='bgEnabled.svg',color=color.gray, y=.41,x=-.8)
+backgroundToggle.on_click = def():
+    background.enabled = not background.enabled
+    localStorage.setItem('backgroundEnabled', background.enabled)
+    if background.enabled:
+        backgroundToggle.texture = 'bgEnabled.svg'
+    else:
+        backgroundToggle.texture = 'bgDisabled.svg'
+    backgroundToggle.color = color.gray
 
 mainGameElements.append(clickToEarn)
+
+###### Generators ######
+
+def loadGenerators():
+    if game.generatorData["gen1"]:
+        gen1.cost = game.generatorData["gen1"][1]
+    gen1.text = "Generate " + formatNumber(5) + " clicks a second\nCost: " + formatNumber(gen1.cost) + " clicks"
+    if game.generatorData["gen2"]:
+        gen2.cost = game.generatorData["gen2"][1]
+    gen2.text = "Generate " + formatNumber(18) + " clicks a second\nCost: " + formatNumber(gen2.cost) + " clicks"
+    if game.generatorData["gen3"]:
+        gen3.cost = game.generatorData["gen3"][1]
+    gen3.text = "Generate " + formatNumber(70) + " clicks a second\nCost: " + formatNumber(gen3.cost) + " clicks"
+    if game.generatorData["gen4"]:
+        gen4.cost = game.generatorData["gen4"][1]
+    gen4.text = "Generate " + formatNumber(260) + " clicks a second\nCost: " + formatNumber(gen4.cost) + " clicks"
+    if game.generatorData["gen5"]:
+        gen5.cost = game.generatorData["gen5"][1]
+    gen5.text = "Generate " + formatNumber(950) + " clicks a second\nCost: " + formatNumber(gen5.cost) + " clicks"
+    if game.generatorData["gen6"]:
+        gen6.cost = game.generatorData["gen6"][1]
+    gen6.text = "Generate " + formatNumber(3300) + " clicks a second\nCost: " + formatNumber(gen6.cost) + " clicks"
+
+exitGenerator = Button(text = 'RETURN', position=top_left, padding=.2, enabled = false)
+exitGenerator.y-=.05
+exitGenerator.x+=.15
+exitGenerator.fit_to_text()
+exitGenerator.on_click = def():
+    for e in generatorElements:
+        e.enabled = false
+    for e in mainGameElements:
+        e.enabled = true
+    
+
+    if localStorage.getItem('backgroundEnabled') === 'true':
+        backgroundToggle.svg = 'bgEnabled.svg'
+        background.enabled = true
+    else:
+        backgroundToggle.svg = 'bgDisabled.svg'
+        background.enabled = false
+
+gen1 = Button(name="gen1",cost=100,genAmount=5,text_size=1,position=left,padding=.4,enabled=false,text = "Generate " + formatNumber(5) + " clicks a second\nCost: " + formatNumber(100) + " clicks")
+gen1.x+=.17
+gen1.y+=.28
+gen1.on_click = def():
+    game.buyGen(gen1,gen1.cost, gen1.genAmount, gen1.name)
+gen1.fit_to_text()
+
+gen2 = Button(name="gen2",cost=10000,genAmount=18,text_size=1,position=left,padding=.4,enabled=false,text = "Generate " + formatNumber(18) + " clicks a second\nCost: " + formatNumber(10000) + " clicks")
+gen2.x+=.17
+gen2.y+=.15
+gen2.on_click = def():
+    game.buyGen(gen2,gen2.cost, gen2.genAmount, gen2.name)
+gen2.fit_to_text()
+
+gen3 = Button(name="gen3",cost=55000,genAmount=70,text_size=1,position=left,padding=.4,enabled=false,text = "Generate " + formatNumber(70) + " clicks a second\nCost: " + formatNumber(55000) + " clicks")
+gen3.x+=.17
+gen3.on_click = def():
+    game.buyGen(gen3,gen3.cost, gen3.genAmount, gen3.name)
+gen3.fit_to_text()
+
+gen4 = Button(name="gen4",cost=300000,genAmount=260,text_size=1,position=left,padding=.4,enabled=false,text = "Generate " + formatNumber(260) + " clicks a second\nCost: " + formatNumber(300000) + " clicks")
+gen4.x+=.17
+gen4.y-=.15
+gen4.on_click = def():
+    game.buyGen(gen4,gen4.cost, gen4.genAmount, gen4.name)
+gen4.fit_to_text()
+
+gen5 = Button(name="gen5",cost=1600000,genAmount=950,text_size=1,position=left,padding=.4,enabled=false,text = "Generate " + formatNumber(950) + " clicks a second\nCost: " + formatNumber(1600000) + " clicks")
+gen5.x+=.17
+gen5.y-=.3
+gen5.on_click = def():
+    game.buyGen(gen5,gen5.cost, gen5.genAmount, gen5.name)
+gen5.fit_to_text()
+
+gen6 = Button(name="gen6",cost=8500000,genAmount=3300,text_size=2,padding=.4,enabled=false,text = "Generate " + formatNumber(3300) + " clicks a second\nCost: " + formatNumber(8500000) + " clicks")
+#gen6.x+=.8
+gen6.on_click = def():
+    game.buyGen(gen6,gen6.cost, gen6.genAmount, gen6.name)
+gen6.fit_to_text()
+
+generatorElements.append(scoreText)
+generatorElements.append(exitGenerator)
+generatorElements.append(gen1)
+generatorElements.append(gen2)
+generatorElements.append(gen3)
+generatorElements.append(gen4)
+generatorElements.append(gen5)
+generatorElements.append(gen6)
+
+background = Entity(name="background",z=9999,enabled=false,parent=camera.ui, texture='space.jpg',scale_x=1.78, scale_y=1.01)
+
 game = new GameLogic(data)
 
 #loadScreen("game")

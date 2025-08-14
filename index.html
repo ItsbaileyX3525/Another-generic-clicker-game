@@ -9,6 +9,8 @@
 
 <body style="background-color: black;">
 <script>
+let saveVersion = 1.0
+
 function clickSound() {
     let click = new Audio('/assets/Click.mp3')
     click.play()
@@ -51,6 +53,12 @@ class GameLogic {
         this.firstLoadScore = true
         if (data) {
             data = JSON.parse(data)
+            this.saveVersion = parseInt(data["saveVersion"],10)
+            if (this.saveVersion === saveVersion) {
+                print("Game save up to date... yea good job")
+            } else {
+                print("Alert alert user data out of date, attempted to migrate... not atm tho (not implemented)")
+            }
             this.milestones = data["milestones"]
             this.upgrades = data["upgrades"]
             this.totalScore = parseInt(data["totalScore"],10)
@@ -77,6 +85,7 @@ class GameLogic {
             this.milestones = {
                 "achieved50Clicks" : false,
             }
+            this.saveVersion = 1.0
             this.upgrades = {}
             this.score = 0
             this.generateAmount = 0
@@ -103,6 +112,7 @@ class GameLogic {
     set clicks(newval) {
         this._clicks = parseInt(newval,10)
         if (this.firstLoadClicks) {this.firstLoadClicks=false;return}
+        print(this._clicks)
         if (this.clicks >= 10 && !this.milestones["achieved10Clicks"]) {
             this.milestones["achieved10Clicks"] = true
             window.clicks10()
@@ -110,6 +120,18 @@ class GameLogic {
         if (this.clicks >= 50 && !this.milestones["achieved50Clicks"]) {
             this.milestones["achieved50Clicks"] = true
             window.clicks50()
+        }
+        if (this.clicks >= 100 && !this.milestones["achieved100Clicks"]) {
+            this.milestones["achieved100Clicks"] = true
+            window.clicks100()
+        }
+        if (this.clicks >= 225 && !this.milestones["achieved225Clicks"]) {
+            this.milestones["achieved225Clicks"] = true
+            window.clicks225()
+        }
+        if (this.clicks >= 500 && !this.milestones["achieved500Clicks"]) {
+            this.milestones["achieved500Clicks"] = true
+            window.clicks500()
         }
     }
 
@@ -152,28 +174,18 @@ class GameLogic {
         if (this.score >= parseInt(this.upgrades[upgrade][0],10)) {
             this.upgrades[upgrade][1] = true
             this.score -= parseInt(this.upgrades[upgrade][0],10)
-            let index = activeUpgrades.indexOf(el)
-            if (index !== -1) {
-                console.log("Found active upgrade, removing")
-                activeUpgrades.splice(index, 1)
-            } else {
-                console.log("error with index")
-            }
+            activeUpgrades.shift()
             destroy(el)
-            if (activeUpgrades.length >= 1){
-                for (let e of activeUpgrades) {
-                    e.x += 0.13
-                }
-            }
             if (storedUpgrades.length >= 1) {
-                console.log("Found stored upgrade, adding")
-                console.log(storedUpgrades)
                 addUpgrade(storedUpgrades[0][0],storedUpgrades[0][1],storedUpgrades[0][2])
                 storedUpgrades.shift()
             }
             loadUpgrades()
             removeHover(el)
             purchaseUpgradeSFX.play()
+            if (storedUpgrades.length == 0) {
+                nextUpgrade.enabled = false
+            }
             return true
         } else {
             purchaseUpgradeFailSFX.play()
@@ -223,7 +235,8 @@ class GameLogic {
             "milestones" : this.milestones,
             "upgrades" : this.upgrades,
             "totalScore" : this.totalScore,
-            "generatorData" : this.generatorData
+            "generatorData" : this.generatorData,
+            "saveVersion" : this.saveVersion
         }
         console.log("Saved")
         localStorage.setItem('gameData', JSON.stringify(save))
@@ -318,10 +331,18 @@ gameStart.on_click = def():
             loadUpgrades()
             loadGenerators()
 
+erasedText = Text(enabled=false,text='Data erased successfully!',y=.3, text_color=color.red)
+erasedText.fit_to_text()
+
+if localStorage.getItem('erased') == 'true':
+    localStorage.setItem('erased', 'false')
+    erasedText.enabled = true
+
 eraseData = Button(text='Erase save',padding=.3,text_size=2.5,y=-.22)
 eraseData.fit_to_text()
 eraseData.on_click = def():
     localStorage.clear()
+    localStorage.setItem('erased', 'true')
     window.location.reload()
 
 infoButton = Button(text = 'What game engine is this?',padding=1, scale_x = .4, scale_y = .1, text_size = 1.6, y=-.4, text_color = color.light_gray, color=color.dark_gray)
@@ -346,6 +367,7 @@ startScreenElements.append(gameTitle)
 startScreenElements.append(gameStart)
 startScreenElements.append(infoButton)
 startScreenElements.append(eraseData)
+startScreenElements.append(erasedText)
 
 infoScreenElements.append(infoText)
 infoScreenElements.append(infoScreenBG)
@@ -354,14 +376,27 @@ infoScreenElements.append(infoReturn)
 
 ########## Clicker game stuff ###########
 
+# Add critical clicks
+
 def clicks10():
     game.upgrades["scoreDisplay"] = [10, false, "See how much clicks you have"]
     addUpgrade("scoreDisplay", game.upgrades["scoreDisplay"][2], game.upgrades["scoreDisplay"][0])
 
-
 def clicks50():
     game.upgrades["clickAnim"] = [50, false, "Add a cool click animation"]
     addUpgrade("clickAnim", game.upgrades["clickAnim"][2], game.upgrades["clickAnim"][0])
+
+def clicks100():
+    game.upgrades["clickEffects"] = [199, false, "Make some particles appear!"]
+    addUpgrade("clickEffects", game.upgrades["clickEffects"][2], game.upgrades["clickEffects"][0])
+          
+def clicks225():
+    game.upgrades["clickCrit"] = [425, false, "Unlock critical clicks!"]
+    addUpgrade("clickCrit", game.upgrades["clickCrit"][2], game.upgrades["clickCrit"][0])
+
+def clicks500():
+    game.upgrades["clickPower"] = [5000, false, "Increase your click power tenfold!"]
+    addUpgrade("clickPower", game.upgrades["clickPower"][2], game.upgrades["clickPower"][0])
 
 def score150():
     game.upgrades["generators"] = [250, false, "Unlock some automation"]
@@ -391,12 +426,12 @@ def loadUpgrades():
         generatorButton.enabled = true
         mainGameElements.append(generatorButton)
     if game.upgrades['background'] and game.upgrades['background'][1]:
-        if localStorage.getItem('backgroundEnabled') === 'true':
+        if localStorage.getItem('backgroundEnabled') === 'true' or localStorage.getItem('backgroundEnabled') === null:
             background.enabled = true
         mainGameElements.append(background)
     if game.upgrades['removeBackground'] and game.upgrades['removeBackground'][1]:
         backgroundToggle.enabled = true
-        if localStorage.getItem('backgroundEnabled') === 'true':
+        if localStorage.getItem('backgroundEnabled') === 'true' or localStorage.getItem('backgroundEnabled') === null:
             backgroundToggle.texture = 'bgEnabled.svg'
         else:
             backgroundToggle.texture = 'bgDisabled.svg'
@@ -407,12 +442,13 @@ def addUpgrade(upgrade, description, cost):
     if activeUpgrades.length >= 1:
         upgrade = [upgrade, description, cost]
         storedUpgrades.append(upgrade)
+        nextUpgrade.enabled = true
         return
-
+    
     for e in activeUpgrades:
         e.x-=.13 
 
-    b = Button(text=upgrade, text_size=1.3, color=color.black, text_color=color.white, scale=.125,y=-.11,x=0)
+    b = Button(text=upgrade,name="upgradeButton",price=cost, text_size=1.3, color=color.black, text_color=color.white, scale=.125,y=-.11,x=0,desc=description)
     b.on_click = def():
         game.purchaseUpgrade(upgrade, b)
     
@@ -420,6 +456,9 @@ def addUpgrade(upgrade, description, cost):
 
 
     activeUpgrades.append(b)
+
+    if storedUpgrades.length == 0:
+        nextUpgrade.enabled = false
 
 mouseTooltip = Text(enabled = false, text_color=color.white,text = 'description of what\nthe button does\n<center>Cost: 50</center>', text_size=2, color=color.black)
 mouseTooltip.fit_to_text()
@@ -450,18 +489,67 @@ scoreText.fit_to_text()
 scoreText.update = def():
     scoreText.text = 'Clicks: ' + formatNumber(game.score)
 
+minParticleX = .2
+maxParticleX = .5
+
+def destroyParticle(particle):
+    after 1:
+        destroy(particle)
+
+def showParticle(amount, isCrit):
+    colorShown = color.yellow
+    if isCrit:
+        colorShown = color.orange
+    xPos = Math.random() * (maxParticleX - minParticleX) + minParticleX
+    particle = Text(text = '+' + String(amount), text_color=colorShown,y=-.25,x=xPos)
+    particle.animate('y', -.1, duration = 2, curve=curves.out_expo)
+    destroyParticle(particle)
+
 clickToEarn = Button(y=.07,enabled = false)  
 clickToEarn.on_click = def():
     clickSound()
+    randChance = 0
+    multiplier = 1
+    amount = 0
+    isCrit = false
+    if Object.hasOwn(game.upgrades, "clickCrit") and game.upgrades["clickCrit"][1]:
+        randChance = Math.floor(Math.random() * 15) + 1
+        if randChance == 15:
+            multiplier = 4
+            isCrit = true
     if Object.hasOwn(game.upgrades, "clickAnim") and game.upgrades["clickAnim"][1]:
         clickToEarn.scale=.22
         clickToEarn.animate('scale_x', .2, duration=.1)
         clickToEarn.animate('scale_y', .2, duration=.1)
-        game.score += 2
+        if Object.hasOwn(game.upgrades, "clickPower") and game.upgrades["clickPower"][1]:
+            amount = 20 * multiplier
+            game.score += amount
+        else:
+            amount = 2 * multiplier
+            game.score += amount
     else:
-        game.score += 1
+        amount = 1 * multiplier
+        game.score += amount
+
     
     game.clicks += 1
+
+    if Object.hasOwn(game.upgrades, "clickEffects") and game.upgrades["clickEffects"][1]:
+        showParticle(amount, isCrit)
+
+nextUpgrade = Button(enabled=false,text = '>', y=-.11,x=.12, padding=.27,text_size=2.6)
+nextUpgrade.fit_to_text()
+nextUpgrade.on_click = def():
+    if len(storedUpgrades) >= 1:
+        tmpCost  = activeUpgrades[0].price
+        tmpName = activeUpgrades[0].text
+        tmpDesc = activeUpgrades[0].desc
+        const b = document.getElementById('upgradeButton')
+        b.remove()
+        storedUpgrades.append([tmpName,tmpDesc,tmpCost])
+        activeUpgrades.shift()
+        addUpgrade(storedUpgrades[0][0],storedUpgrades[0][1],storedUpgrades[0][2])
+        storedUpgrades.shift()
 
 generatorButton = Button(text = "Generators", x=.67, padding=.6, text_color=color.white, color=color.black, enabled = false)
 generatorButton.on_click = def():
@@ -524,41 +612,41 @@ exitGenerator.on_click = def():
         backgroundToggle.svg = 'bgDisabled.svg'
         background.enabled = false
 
-gen1 = Button(name="gen1",cost=100,genAmount=5,text_size=1,position=left,padding=.4,enabled=false,text = "Generate " + formatNumber(5) + " clicks a second\nCost: " + formatNumber(100) + " clicks")
+gen1 = Button(name="gen1",cost=75,genAmount=5,text_size=1,position=left,padding=.4,enabled=false,text = "Generate " + formatNumber(5) + " clicks a second\nCost: " + formatNumber(75) + " clicks")
 gen1.x+=.17
 gen1.y+=.28
 gen1.on_click = def():
     game.buyGen(gen1,gen1.cost, gen1.genAmount, gen1.name)
 gen1.fit_to_text()
 
-gen2 = Button(name="gen2",cost=10000,genAmount=18,text_size=1,position=left,padding=.4,enabled=false,text = "Generate " + formatNumber(18) + " clicks a second\nCost: " + formatNumber(10000) + " clicks")
+gen2 = Button(name="gen2",cost=1200,genAmount=18,text_size=1,position=left,padding=.4,enabled=false,text = "Generate " + formatNumber(18) + " clicks a second\nCost: " + formatNumber(1200) + " clicks")
 gen2.x+=.17
 gen2.y+=.15
 gen2.on_click = def():
     game.buyGen(gen2,gen2.cost, gen2.genAmount, gen2.name)
 gen2.fit_to_text()
 
-gen3 = Button(name="gen3",cost=55000,genAmount=70,text_size=1,position=left,padding=.4,enabled=false,text = "Generate " + formatNumber(70) + " clicks a second\nCost: " + formatNumber(55000) + " clicks")
+gen3 = Button(name="gen3",cost=7500,genAmount=70,text_size=1,position=left,padding=.4,enabled=false,text = "Generate " + formatNumber(70) + " clicks a second\nCost: " + formatNumber(7500) + " clicks")
 gen3.x+=.17
 gen3.on_click = def():
     game.buyGen(gen3,gen3.cost, gen3.genAmount, gen3.name)
 gen3.fit_to_text()
 
-gen4 = Button(name="gen4",cost=300000,genAmount=260,text_size=1,position=left,padding=.4,enabled=false,text = "Generate " + formatNumber(260) + " clicks a second\nCost: " + formatNumber(300000) + " clicks")
+gen4 = Button(name="gen4",cost=40000,genAmount=260,text_size=1,position=left,padding=.4,enabled=false,text = "Generate " + formatNumber(260) + " clicks a second\nCost: " + formatNumber(40000) + " clicks")
 gen4.x+=.17
 gen4.y-=.15
 gen4.on_click = def():
     game.buyGen(gen4,gen4.cost, gen4.genAmount, gen4.name)
 gen4.fit_to_text()
 
-gen5 = Button(name="gen5",cost=1600000,genAmount=950,text_size=1,position=left,padding=.4,enabled=false,text = "Generate " + formatNumber(950) + " clicks a second\nCost: " + formatNumber(1600000) + " clicks")
+gen5 = Button(name="gen5",cost=180000,genAmount=950,text_size=1,position=left,padding=.4,enabled=false,text = "Generate " + formatNumber(950) + " clicks a second\nCost: " + formatNumber(180000) + " clicks")
 gen5.x+=.17
 gen5.y-=.3
 gen5.on_click = def():
     game.buyGen(gen5,gen5.cost, gen5.genAmount, gen5.name)
 gen5.fit_to_text()
 
-gen6 = Button(name="gen6",cost=8500000,genAmount=3300,text_size=2,padding=.4,enabled=false,text = "Generate " + formatNumber(3300) + " clicks a second\nCost: " + formatNumber(8500000) + " clicks")
+gen6 = Button(name="gen6",cost=750000,genAmount=3300,text_size=2,padding=.4,enabled=false,text = "Generate " + formatNumber(3300) + " clicks a second\nCost: " + formatNumber(750000) + " clicks")
 #gen6.x+=.8
 gen6.on_click = def():
     game.buyGen(gen6,gen6.cost, gen6.genAmount, gen6.name)

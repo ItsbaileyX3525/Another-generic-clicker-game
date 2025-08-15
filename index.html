@@ -174,17 +174,24 @@ class GameLogic {
         if (this.score >= parseInt(this.upgrades[upgrade][0],10)) {
             this.upgrades[upgrade][1] = true
             this.score -= parseInt(this.upgrades[upgrade][0],10)
+            
             activeUpgrades.shift()
+            
+            removeHover(el)
             destroy(el)
+            
             if (storedUpgrades.length >= 1) {
-                addUpgrade(storedUpgrades[0][0],storedUpgrades[0][1],storedUpgrades[0][2])
+                addUpgrade(storedUpgrades[0][0], storedUpgrades[0][1], storedUpgrades[0][2], true)
                 storedUpgrades.shift()
             }
+            
             loadUpgrades()
-            removeHover(el)
             purchaseUpgradeSFX.play()
+            
             if (storedUpgrades.length == 0) {
                 nextUpgrade.enabled = false
+            } else {
+                nextUpgrade.enabled = true
             }
             return true
         } else {
@@ -324,12 +331,17 @@ gameStart.on_click = def():
             for e in mainGameElements:
                 e.enabled = true
                 backgroundMusic.play()
-            for ([key, value] of Object.entries(game.upgrades)) {
+        
+        activeUpgrades = []
+        storedUpgrades = []
+        
+        for ([key, value] of Object.entries(game.upgrades)) {
 
-                    if not value[1]:
-                        addUpgrade(key, value[2], value[0])
-            loadUpgrades()
-            loadGenerators()
+                if not value[1]:
+                    addUpgrade(key, value[2], value[0])        
+        
+        loadUpgrades()
+        loadGenerators()
 
 erasedText = Text(enabled=false,text='Data erased successfully!',y=.3, text_color=color.red)
 erasedText.fit_to_text()
@@ -375,8 +387,6 @@ infoScreenElements.append(infoReturn)
 
 
 ########## Clicker game stuff ###########
-
-# Add critical clicks
 
 def clicks10():
     game.upgrades["scoreDisplay"] = [10, false, "See how much clicks you have"]
@@ -438,26 +448,33 @@ def loadUpgrades():
         backgroundToggle.color = color.gray
         mainGameElements.append(backgroundToggle)
 
-def addUpgrade(upgrade, description, cost):
+def addUpgrade(upgrade, description, cost, skipDuplicateCheck = false):
+    if not skipDuplicateCheck:
+        for activeUpg in activeUpgrades:
+            if activeUpg.text == upgrade:
+                return
+        
+        for storedUpg in storedUpgrades:
+            if storedUpg[0] == upgrade:
+                return
+    
     if activeUpgrades.length >= 1:
-        upgrade = [upgrade, description, cost]
-        storedUpgrades.append(upgrade)
+        upgradeData = [upgrade, description, cost]
+        storedUpgrades.append(upgradeData)
         nextUpgrade.enabled = true
         return
     
     for e in activeUpgrades:
         e.x-=.13 
-
-    b = Button(text=upgrade,name="upgradeButton",price=cost, text_size=1.3, color=color.black, text_color=color.white, scale=.125,y=-.11,x=0,desc=description)
+    b = Button(parent=upgradeHolder,text=upgrade,name="upgradeButton",price=cost, text_size=1.3, color=color.black, text_color=color.white, scale=.125,y=-.11,x=0,desc=description)
     b.on_click = def():
         game.purchaseUpgrade(upgrade, b)
-    
     addHover(b.el,description,cost)
-
-
     activeUpgrades.append(b)
-
-    if storedUpgrades.length == 0:
+    
+    if storedUpgrades.length > 0:
+        nextUpgrade.enabled = true
+    else:
         nextUpgrade.enabled = false
 
 mouseTooltip = Text(enabled = false, text_color=color.white,text = 'description of what\nthe button does\n<center>Cost: 50</center>', text_size=2, color=color.black)
@@ -537,19 +554,27 @@ clickToEarn.on_click = def():
     if Object.hasOwn(game.upgrades, "clickEffects") and game.upgrades["clickEffects"][1]:
         showParticle(amount, isCrit)
 
-nextUpgrade = Button(enabled=false,text = '>', y=-.11,x=.12, padding=.27,text_size=2.6)
+upgradeHolder = Entity(parent=camera.ui, color=color.clear)
+
+nextUpgrade = Button(parent=upgradeHolder,enabled=false,text = '>', y=-.11,x=.12, padding=.27,text_size=2.6)
 nextUpgrade.fit_to_text()
 nextUpgrade.on_click = def():
     if len(storedUpgrades) >= 1:
-        tmpCost  = activeUpgrades[0].price
-        tmpName = activeUpgrades[0].text
-        tmpDesc = activeUpgrades[0].desc
-        const b = document.getElementById('upgradeButton')
-        b.remove()
-        storedUpgrades.append([tmpName,tmpDesc,tmpCost])
-        activeUpgrades.shift()
-        addUpgrade(storedUpgrades[0][0],storedUpgrades[0][1],storedUpgrades[0][2])
+        if len(activeUpgrades) > 0:
+            currentUpgrade = activeUpgrades[0]
+            currentUpgradeData = [currentUpgrade.text, currentUpgrade.desc, currentUpgrade.price]
+            storedUpgrades.append(currentUpgradeData)
+            
+            removeHover(currentUpgrade)
+            destroy(currentUpgrade)
+            activeUpgrades.shift()
+        
+        nextUpgradeData = storedUpgrades[0]
         storedUpgrades.shift()
+        
+        addUpgrade(nextUpgradeData[0], nextUpgradeData[1], nextUpgradeData[2], true)
+        
+        nextUpgrade.enabled = true
 
 generatorButton = Button(text = "Generators", x=.67, padding=.6, text_color=color.white, color=color.black, enabled = false)
 generatorButton.on_click = def():
@@ -571,6 +596,7 @@ backgroundToggle.on_click = def():
     backgroundToggle.color = color.gray
 
 mainGameElements.append(clickToEarn)
+mainGameElements.append(upgradeHolder)
 
 ###### Generators ######
 
@@ -605,7 +631,7 @@ exitGenerator.on_click = def():
         e.enabled = true
     
 
-    if localStorage.getItem('backgroundEnabled') === 'true':
+    if localStorage.getItem('backgroundEnabled') === 'true' or localStorage.getItem('backgroundEnabled') === null:
         backgroundToggle.svg = 'bgEnabled.svg'
         background.enabled = true
     else:

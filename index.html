@@ -11,10 +11,10 @@
 <script>
 let saveVersion = 1.0
 
-function clickSound() {
+function clickSound(vol = .4) {
     let click = new Audio('/assets/Click.mp3')
     click.play()
-    click.volume = .4
+    click.volume = vol
     click.addEventListener('ended', () => {
         click.pause()
         click = null
@@ -129,6 +129,11 @@ class GameLogic {
             this.milestones["achieved225Clicks"] = true
             window.clicks225()
         }
+        if (this.clicks >= 350 && !this.milestones["achieved350Clicks"]) {
+            this.milestones["achieved350Clicks"] = true
+            window.clicks350()
+        }
+        clicks350
         if (this.clicks >= 500 && !this.milestones["achieved500Clicks"]) {
             this.milestones["achieved500Clicks"] = true
             window.clicks500()
@@ -287,6 +292,18 @@ function removeHover(el) {
 		delete el._boundLeave;
 	}
 }
+
+function getPerformance() {
+    return performance.now()
+}
+
+function getDelta() {
+    calc = getPerformance() - lastTime
+	delta = calc / 1000
+	lastTime = getPerformance()
+    return delta
+}
+
 </script>
 <script src="/taptapir/taptapir.js">
 </script>
@@ -313,8 +330,23 @@ def loadScreen(name): #Debuggin
         for e in infoScreenElements:
             e.enabled = true
     if name == "game":
-        for e in mainGameElements:
-            e.enabled = true 
+        for e in startScreenElements:
+            e.enabled = false
+        after .01:
+            for e in mainGameElements:
+                e.enabled = true
+                backgroundMusic.play()
+        
+        activeUpgrades = []
+        storedUpgrades = []
+        
+        for ([key, value] of Object.entries(game.upgrades)) {
+
+                if not value[1]:
+                    addUpgrade(key, value[2], value[0])        
+        
+        loadUpgrades()
+        loadGenerators()
 
 gameTitle = Text(text = 'Another generic clicker game',y=.4, text_color = color.white)
 gameTitle.fit_to_text()
@@ -404,6 +436,10 @@ def clicks225():
     game.upgrades["clickCrit"] = [425, false, "Unlock critical clicks!"]
     addUpgrade("clickCrit", game.upgrades["clickCrit"][2], game.upgrades["clickCrit"][0])
 
+def clicks350():
+    game.upgrades["autoClicker"] = [900, false, "Be lazy, auto click!"]
+    addUpgrade("autoClicker", game.upgrades["autoClicker"][2], game.upgrades["autoClicker"][0])
+
 def clicks500():
     game.upgrades["clickPower"] = [5000, false, "Increase your click power tenfold!"]
     addUpgrade("clickPower", game.upgrades["clickPower"][2], game.upgrades["clickPower"][0])
@@ -447,6 +483,8 @@ def loadUpgrades():
             backgroundToggle.texture = 'bgDisabled.svg'
         backgroundToggle.color = color.gray
         mainGameElements.append(backgroundToggle)
+    if game.upgrades['autoClicker'] and game.upgrades['autoClicker'][1]:
+        autoClicker.enabled = true
 
 def addUpgrade(upgrade, description, cost, skipDuplicateCheck = false):
     if not skipDuplicateCheck:
@@ -522,6 +560,8 @@ def showParticle(amount, isCrit):
     particle.animate('y', -.1, duration = 2, curve=curves.out_expo)
     destroyParticle(particle)
 
+prevClickAmount = parseInt(localStorage.getItem('clickAmount'), 10) || 0
+
 clickToEarn = Button(y=.07,enabled = false)  
 clickToEarn.on_click = def():
     clickSound()
@@ -539,12 +579,18 @@ clickToEarn.on_click = def():
         clickToEarn.animate('scale_x', .2, duration=.1)
         clickToEarn.animate('scale_y', .2, duration=.1)
         if Object.hasOwn(game.upgrades, "clickPower") and game.upgrades["clickPower"][1]:
+            localStorage.setItem('clickAmount', 20)
+            prevClickAmount = 20
             amount = 20 * multiplier
             game.score += amount
         else:
+            localStorage.setItem('clickAmount', 2)
+            prevClickAmount = 2
             amount = 2 * multiplier
             game.score += amount
     else:
+        localStorage.setItem('clickAmount', 1)
+        prevClickAmount = 1
         amount = 1 * multiplier
         game.score += amount
 
@@ -553,6 +599,49 @@ clickToEarn.on_click = def():
 
     if Object.hasOwn(game.upgrades, "clickEffects") and game.upgrades["clickEffects"][1]:
         showParticle(amount, isCrit)
+
+
+#Shocking how hard this was to make
+autoClickerMaxX = -.146
+autoClickerMinX =  -.19
+autoClickInterval = 1.0 / 3.5
+autoClickTimer = 0
+
+lastTime = getPerformance();
+delta = 0
+calc = 0
+
+def click():
+    autoClicker.animate("x", autoClickerMaxX, duration = autoClickInterval/2, curve=curves.in_out_expo)
+    multiplier = 1
+    isCrit = false
+    if Object.hasOwn(game.upgrades, "clickCrit") and game.upgrades["clickCrit"][1]:
+        randChance = Math.floor(Math.random() * 15) + 1
+        if randChance == 15:
+            multiplier = 4
+            isCrit = true
+    after autoClickInterval/2:
+        clickSound(.1)
+        game.clicks += .2 //Because I'm evil
+        if prevClickAmount === 0:
+            prevClickAmount = 1
+        amount = prevClickAmount * multiplier
+        game.score += amount
+        if Object.hasOwn(game.upgrades, "clickEffects") and game.upgrades["clickEffects"][1]:
+            showParticle(amount, isCrit)
+
+        autoClicker.animate("x", autoClickerMinX, duration = autoClickInterval/2, curve=curves.in_out_expo)
+
+autoClicker = Entity(enabled=false,parent=camera.ui,texture='cursorClick.svg',scale=.1, x=-.19,y=.05,rotation=90)
+autoClicker.update = def():
+    if autoClicker.enabled:
+        delta = getDelta()
+
+        autoClickTimer += delta
+        if autoClickTimer >= autoClickInterval:
+            click()
+            autoClickTimer = 0
+
 
 upgradeHolder = Entity(parent=camera.ui, color=color.clear)
 

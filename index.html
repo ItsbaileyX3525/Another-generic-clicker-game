@@ -9,7 +9,7 @@
 
 <body style="background-color: black;">
 <script>
-let saveVersion = 1.0
+let saveVersion = 1.1
 
 function clickSound(vol = .4) {
     let click = new Audio('/assets/Click.mp3')
@@ -23,6 +23,11 @@ function clickSound(vol = .4) {
 
 let backgroundMusic = new Audio('/assets/DanTDM - Spacedog.mp3')
 backgroundMusic.volume = .4
+
+let achievementEarnSound = new Audio('/assets/AchievementGot.mp3')
+achievementEarnSound.volume = .4
+let achievementEarnSoundBetter = new Audio('/assets/AchievementGotBest.mp3')
+achievementEarnSoundBetter.volume = .4
 
 let saveGameSFX = new Audio('/assets/save.mp3')
 let purchaseUpgradeSFX = new Audio('/assets/purchase.mp3')
@@ -53,13 +58,15 @@ class GameLogic {
         this.firstLoadScore = true
         if (data) {
             data = JSON.parse(data)
-            this.saveVersion = parseInt(data["saveVersion"],10)
+            this.saveVersion = parseFloat(data["saveVersion"],10)
             if (this.saveVersion === saveVersion) {
                 print("Game save up to date... yea good job")
             } else {
                 print("Alert alert user data out of date, attempted to migrate... not atm tho (not implemented)")
+                warningText.enabled = true
             }
             this.milestones = data["milestones"]
+            this.achievements = data["achievements"]
             this.upgrades = data["upgrades"]
             this.totalScore = parseInt(data["totalScore"],10)
             this.score = parseInt(data["score"],10);
@@ -85,13 +92,16 @@ class GameLogic {
             this.milestones = {
                 "achieved50Clicks" : false,
             }
-            this.saveVersion = 1.0
+            this.saveVersion = 1.1
             this.upgrades = {}
             this.score = 0
             this.generateAmount = 0
             this.clicks = 0
             this.totalScore = 0
             this.generatorData = {}
+            this.achievements = {
+                "idkJustRandomPlaceHolder" : false,
+            }
             if (!window._genIntervalSet) {
                 window._genIntervalSet = true
                 setInterval(() => this.generateScore(), 1000);
@@ -100,7 +110,7 @@ class GameLogic {
                 window._saveIntervalSet = true
                 setInterval(() => this.saveGame(), 2500);
             }
-            console.log('[GameLogic] Fresh start.')
+            console.log('[GameLogic] Fresh start.') //<--- How sigma does this look
         }
 
     }
@@ -112,7 +122,7 @@ class GameLogic {
     set clicks(newval) {
         this._clicks = parseInt(newval,10)
         if (this.firstLoadClicks) {this.firstLoadClicks=false;return}
-        print(this._clicks)
+        //Game upgrades
         if (this.clicks >= 10 && !this.milestones["achieved10Clicks"]) {
             this.milestones["achieved10Clicks"] = true
             window.clicks10()
@@ -133,10 +143,19 @@ class GameLogic {
             this.milestones["achieved350Clicks"] = true
             window.clicks350()
         }
-        clicks350
         if (this.clicks >= 500 && !this.milestones["achieved500Clicks"]) {
             this.milestones["achieved500Clicks"] = true
             window.clicks500()
+        }
+
+
+        //Achievements
+        print(this.clicks)
+        print(!this.achievements["firstClick"])
+        if (this.clicks >= 1 && !this.achievements["firstClick"]) {
+            print("Showing achievement")
+            this.achievements["firstClick"] = true
+            window.displayAchievement('Getting started!', false)
         }
     }
 
@@ -248,9 +267,9 @@ class GameLogic {
             "upgrades" : this.upgrades,
             "totalScore" : this.totalScore,
             "generatorData" : this.generatorData,
-            "saveVersion" : this.saveVersion
+            "saveVersion" : this.saveVersion,
+            "achievements" : this.achievements,
         }
-        console.log("Saved")
         localStorage.setItem('gameData', JSON.stringify(save))
     }
 }
@@ -375,6 +394,9 @@ gameStart.on_click = def():
         loadUpgrades()
         loadGenerators()
 
+warningText = Text(enabled=false,text_size=1.8,y=.3,x=.084,text='Your save is outdated and may cause errors, it is\nrecommended that you erase your save to continue playing.', text_color=color.red)
+warningText.fit_to_text()
+
 erasedText = Text(enabled=false,text='Data erased successfully!',y=.3, text_color=color.red)
 erasedText.fit_to_text()
 
@@ -474,6 +496,7 @@ def loadUpgrades():
     if game.upgrades['background'] and game.upgrades['background'][1]:
         if localStorage.getItem('backgroundEnabled') === 'true' or localStorage.getItem('backgroundEnabled') === null:
             background.enabled = true
+        localStorage.setItem('backgroundEnabled', 'true')
         mainGameElements.append(background)
     if game.upgrades['removeBackground'] and game.upgrades['removeBackground'][1]:
         backgroundToggle.enabled = true
@@ -720,7 +743,7 @@ exitGenerator.on_click = def():
         e.enabled = true
     
 
-    if localStorage.getItem('backgroundEnabled') === 'true' or localStorage.getItem('backgroundEnabled') === null:
+    if localStorage.getItem('backgroundEnabled') === 'true':
         backgroundToggle.svg = 'bgEnabled.svg'
         background.enabled = true
     else:
@@ -775,6 +798,49 @@ generatorElements.append(gen3)
 generatorElements.append(gen4)
 generatorElements.append(gen5)
 generatorElements.append(gen6)
+
+######## Achievement related stuff #########
+
+achievementFinalPosX = .64
+achievementStartPosX = 1.141
+
+activeAchievement = false
+storedAchievements = []
+
+def displayAchievement(achievementName, isCool):
+    if activeAchievement:
+        achievement = [achievementName, isCool]
+        storedAchievements.append(achievement)
+        return 
+
+    timeout = 3
+    achievementText.text = achievementName
+    activeAchievement = true
+    if isCool:
+        achievementEarnSoundBetter.play()
+        timeout = 5
+    else:
+        achievementEarnSound.play()
+
+    achievementToast.animate('x', achievementFinalPosX, duration=.7)
+
+    after timeout:
+        achievementToast.animate('x', achievementStartPosX, duration=.7)
+        after .75:
+            activeAchievement = false
+
+achievementToast = Entity(color=color.dark_gray,parent=camera.ui, scale=[.5,.08], x=achievementStartPosX, y=.44)
+achievementToast.update = def():
+    if storedAchievements.length >= 1 and not activeAchievement:
+        displayAchievement(storedAchievements[0][0],storedAchievements[0][1])
+
+achievementIcon = Entity(parent=achievementToast, texture='trophy.svg',x=-.42)
+achievementEarnt = Text(parent=achievementToast,text = 'Achievement Got!',text_size=1.8,y=.3,x=-.05, text_color=color.yellow)
+achievementEarnt.fit_to_text()
+achievementText = Text(parent=achievementToast,text_color=color.light_gray,text='AchievementName',text_size=1.8,y=-.4,x=.08)
+
+//displayAchievement("test achievement", true) Long version
+//displayAchievement("test achievement", false) Short version
 
 background = Entity(name="background",z=9999,enabled=false,parent=camera.ui, texture='space.jpg',scale_x=1.78, scale_y=1.01)
 

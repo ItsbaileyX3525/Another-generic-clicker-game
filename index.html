@@ -667,6 +667,7 @@ achievementButton.on_click = def():
     for e in achievementElements:
         e.enabled = true
 
+    autoClicker.alpha = 0
     loadAchievementDisplay()
 
 #Shocking how hard this was to make
@@ -689,14 +690,17 @@ def click():
             multiplier = 4
             isCrit = true
     after autoClickInterval/2:
-        clickSound(.1)
+        amount = prevClickAmount * multiplier
+        if autoClicker.alpha == "1":
+            clickSound(.1)
+            if Object.hasOwn(game.upgrades, "clickEffects") and game.upgrades["clickEffects"][1]:
+                showParticle(amount, isCrit)
         game.clicks += .2 //Because I'm evil
         if prevClickAmount === 0:
             prevClickAmount = 1
-        amount = prevClickAmount * multiplier
+        
         game.score += amount
-        if Object.hasOwn(game.upgrades, "clickEffects") and game.upgrades["clickEffects"][1]:
-            showParticle(amount, isCrit)
+
 
         autoClicker.animate("x", autoClickerMinX, duration = autoClickInterval/2, curve=curves.in_out_expo)
 

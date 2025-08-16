@@ -56,6 +56,7 @@ class GameLogic {
     constructor(data) {
         this.firstLoadClicks = true
         this.firstLoadScore = true
+        this.achievementCounter = 5
         if (data) {
             data = JSON.parse(data)
             this.saveVersion = parseFloat(data["saveVersion"],10)
@@ -99,8 +100,9 @@ class GameLogic {
             this.clicks = 0
             this.totalScore = 0
             this.generatorData = {}
+            this.boughtUpgrades = 0
             this.achievements = {
-                "idkJustRandomPlaceHolder" : false,
+                "idkJustRandomPlaceHolder" : [false, "", false],
             }
             if (!window._genIntervalSet) {
                 window._genIntervalSet = true
@@ -143,18 +145,15 @@ class GameLogic {
             this.milestones["achieved350Clicks"] = true
             window.clicks350()
         }
-        if (this.clicks >= 500 && !this.milestones["achieved500Clicks"]) {
-            this.milestones["achieved500Clicks"] = true
-            window.clicks500()
+        if (this.clicks >= 1250 && !this.milestones["achieved1250Clicks"]) {
+            this.milestones["achieved1250Clicks"] = true
+            window.clicks1250()
         }
 
 
         //Achievements
-        print(this.clicks)
-        print(!this.achievements["firstClick"])
         if (this.clicks >= 1 && !this.achievements["firstClick"]) {
-            print("Showing achievement")
-            this.achievements["firstClick"] = true
+            this.achievements["firstClick"] = [true, "Click for the first time!", false]
             window.displayAchievement('Getting started!', false)
         }
     }
@@ -183,6 +182,10 @@ class GameLogic {
             this.milestones["achieved1200Score"] = true
             window.score1200()
         }
+        if (this.score >= 3500 && !this.milestones["achieved3500Score"]) {
+            this.milestones["achieved3500Score"] = true
+            window.score3500()
+        }
         
     }
 
@@ -192,13 +195,31 @@ class GameLogic {
 
     set generateAmount(newval) {
         this._generateAmount = newval
+        if (this._generateAmount >= 100 && !this.achievements["100GenerateClicks"]) {
+            this.achievements["100GenerateClicks"] = [true, "Generate 100 clicks a second", false]
+            window.displayAchievement('Generational Wealth', false)
+        }
+        if (this._generateAmount >= 2500 && !this.achievements["2500GenerateClicks"]) {
+            this.achievements["2500GenerateClicks"] = [true, "Generate 2500 clicks a second", false]
+            window.displayAchievement('ITS OVER 2000!', false)
+        }
+        if (this._generateAmount >= 6700 && !this.achievements["6700GenerateClicks"]) {
+            this.achievements["6700GenerateClicks"] = [true, "Generate 6700 clicks a second", true]
+            window.displayAchievement('67 (00) MUSTARDDD', true)
+        } 
     }
 
     purchaseUpgrade = (upgrade, el) => {
         if (this.score >= parseInt(this.upgrades[upgrade][0],10)) {
             this.upgrades[upgrade][1] = true
             this.score -= parseInt(this.upgrades[upgrade][0],10)
-            
+            this.boughtUpgrades += 1
+
+            if (this.boughtUpgrades >= 5 && !this.achievements["5upgrades"]) {
+                this.achievements["5upgrades"] = [true, "Purchase 5 upgrades", false]
+                window.displayAchievement('Getting up there', false)
+            }
+
             activeUpgrades.shift()
             
             removeHover(el)
@@ -269,6 +290,7 @@ class GameLogic {
             "generatorData" : this.generatorData,
             "saveVersion" : this.saveVersion,
             "achievements" : this.achievements,
+            "boughtUpgrades" : this.boughtUpgrades,
         }
         localStorage.setItem('gameData', JSON.stringify(save))
     }
@@ -339,6 +361,8 @@ mainGameElements = []
 generatorElements = []
 activeUpgrades = []
 storedUpgrades = []
+achievementElements = []
+achievements = []
 
 ######## Main menu stuff ############
 
@@ -366,6 +390,11 @@ def loadScreen(name): #Debuggin
         
         loadUpgrades()
         loadGenerators()
+
+    if name == "achievements":
+        for e in achievementElements:
+            e.enabled = true
+        loadAchievementDisplay()
 
 gameTitle = Text(text = 'Another generic clicker game',y=.4, text_color = color.white)
 gameTitle.fit_to_text()
@@ -462,9 +491,10 @@ def clicks350():
     game.upgrades["autoClicker"] = [900, false, "Be lazy, auto click!"]
     addUpgrade("autoClicker", game.upgrades["autoClicker"][2], game.upgrades["autoClicker"][0])
 
-def clicks500():
+def clicks1250():
     game.upgrades["clickPower"] = [5000, false, "Increase your click power tenfold!"]
     addUpgrade("clickPower", game.upgrades["clickPower"][2], game.upgrades["clickPower"][0])
+    prevClickAmount = 20
 
 def score150():
     game.upgrades["generators"] = [250, false, "Unlock some automation"]
@@ -481,6 +511,10 @@ def score800():
 def score1200():
     game.upgrades["removeBackground"] = [1500, false, "Create a button to turn\noff the background!"]
     addUpgrade("removeBackground", game.upgrades["removeBackground"][2], game.upgrades["removeBackground"][0])
+
+def score3500():
+    game.upgrades["achievementsButton"] = [4000, false, "See all your cool achievements!"]
+    addUpgrade("achievementsButton", game.upgrades["achievementsButton"][2], game.upgrades["achievementsButton"][0])
 
 
 def loadUpgrades():
@@ -508,7 +542,10 @@ def loadUpgrades():
         mainGameElements.append(backgroundToggle)
     if game.upgrades['autoClicker'] and game.upgrades['autoClicker'][1]:
         autoClicker.enabled = true
-
+    if game.upgrades["achievementsButton"] and game.upgrades["achievementsButton"][1]:
+        achievementButton.enabled = true
+        mainGameElements.append(achievementButton)
+        
 def addUpgrade(upgrade, description, cost, skipDuplicateCheck = false):
     if not skipDuplicateCheck:
         for activeUpg in activeUpgrades:
@@ -623,6 +660,14 @@ clickToEarn.on_click = def():
     if Object.hasOwn(game.upgrades, "clickEffects") and game.upgrades["clickEffects"][1]:
         showParticle(amount, isCrit)
 
+achievementButton = Button(enabled=false,texture='trophy.svg',color=color.gray, scale=.11, y=.43,x=.65)
+achievementButton.on_click = def():
+    for e in mainGameElements:
+        e.enabled = false
+    for e in achievementElements:
+        e.enabled = true
+
+    loadAchievementDisplay()
 
 #Shocking how hard this was to make
 autoClickerMaxX = -.146
@@ -692,6 +737,7 @@ generatorButton = Button(text = "Generators", x=.67, padding=.6, text_color=colo
 generatorButton.on_click = def():
     for e in mainGameElements:
         e.enabled = false
+    autoClicker.alpha = 0
     for e in generatorElements:
         e.enabled = true
 
@@ -742,6 +788,7 @@ exitGenerator.on_click = def():
     for e in mainGameElements:
         e.enabled = true
     
+    autoClicker.alpha = 1
 
     if localStorage.getItem('backgroundEnabled') === 'true':
         backgroundToggle.svg = 'bgEnabled.svg'
@@ -833,6 +880,7 @@ achievementToast = Entity(color=color.dark_gray,parent=camera.ui, scale=[.5,.08]
 achievementToast.update = def():
     if storedAchievements.length >= 1 and not activeAchievement:
         displayAchievement(storedAchievements[0][0],storedAchievements[0][1])
+        storedAchievements.shift()
 
 achievementIcon = Entity(parent=achievementToast, texture='trophy.svg',x=-.42)
 achievementEarnt = Text(parent=achievementToast,text = 'Achievement Got!',text_size=1.8,y=.3,x=-.05, text_color=color.yellow)
@@ -844,9 +892,143 @@ achievementText = Text(parent=achievementToast,text_color=color.light_gray,text=
 
 background = Entity(name="background",z=9999,enabled=false,parent=camera.ui, texture='space.jpg',scale_x=1.78, scale_y=1.01)
 
+####### Achievement Screen #########
+
+unlockedAchievements = 0
+currentY = .44
+
+def appendAchievement(achievementName, achievementDescription, isCool):
+    newName = achievementName.split(/(?=[A-Z])/)
+    name = ""
+    index = 0
+    for e in newName:
+        if index == 0:
+            e = e.charAt(0).toUpperCase() + e.slice(1);
+        else:
+            e = e.toLowerCase()
+        
+        name += " " + e
+        index += 1
+
+    e = null
+    if isCool:
+        e = Entity(roundness=.5,parent=achievementHolder,scale_y=.1,scale_x=.9,y=currentY,color=color.yellow)
+    else:
+        e = Entity(roundness=.5,parent=achievementHolder,scale_y=.1,scale_x=.9,y=currentY,color=color.light_gray)
+    i = Entity(texture='trophy.svg', parent=e,x=-.44)
+    
+    tHolder =  Entity(color=color.clear, parent=e, scale_y=.9, scale_x=.25,x=-.27)
+    t = Text(parent=tHolder,color=color.clear,text=name,text_size=1.5,scale_y=.44,x=0)
+    tChild = t.el.children[0]
+    tChild.style.overflowX = "hidden"
+    tChild.style.overflowY = 'auto'
+    tChild.style.pointerEvents = "auto"
+    tChild.style.wordWrap = "break-word"
+    tChild.style.whiteSpace = "normal"
+    tChild.addEventListener("wheel", e => {
+        e.preventDefault();
+
+        const scrollAmount = e.deltaY / 3
+
+        tChild.scrollBy({
+            top: scrollAmount,
+            behavior: "smooth"
+        });
+    }, { passive: false });
+    requestAnimationFrame(() => {
+        tChild.scrollTop = .3 * (tChild.scrollHeight - tChild.clientHeight);
+    });
+    #t.fit_to_text()
+    
+    dtHolder = Entity(color=color.clear, parent=e, scale_y=.8, scale_x=.65,x=.125)
+    dt = Text(name="dt",scale_y=.57,parent=dtHolder, text=achievementDescription,text_size=1.7,y=0,x=0)
+    dtChild = dt.el.children[0]
+    dtChild.addEventListener("wheel", e => {
+        e.preventDefault();
+
+        const scrollAmount = e.deltaY / 3
+
+        dtChild.scrollBy({
+            top: scrollAmount,
+            behavior: "smooth"
+        });
+    }, { passive: false });
+    requestAnimationFrame(() => {
+        dtChild.scrollTop = .2 * (dtChild.scrollHeight - dtChild.clientHeight);
+    });
+    dtChild.style.overflowX = "hidden"
+    dtChild.style.overflowY = 'auto'
+    dtChild.style.pointerEvents = "auto"
+    dtChild.style.wordWrap = "break-word"
+    dtChild.style.whiteSpace = "normal"
+    achievements.append(e)
+    currentY -= .13
+
+def loadAchievementDisplay():
+    let screenSize = 1
+    for ([key, value] of Object.entries(game.achievements)) {
+
+            if key == "idkJustRandomPlaceHolder":
+                continue
+            if value[0]:
+                unlockedAchievements += 1
+                appendAchievement(key, value[1], value[2])
+
+
+    maxAchievements.text = unlockedAchievements + '/' + game.achievementCounter + " achievements unlocked!"
+
+achievementHolder = Entity(enabled=false,parent=camera.ui,color=color.clear,scale_y=.85,y=-.075)
+achievementHolder.el.style.overflow = "auto"
+achievementHolder.el.style.pointerEvents = "auto"
+achievementHolder.el.addEventListener("wheel", e => {
+	e.preventDefault();
+
+	const scrollAmount = e.deltaY / 3
+
+	achievementHolder.el.scrollBy({
+		top: scrollAmount,
+		behavior: "smooth"
+	});
+}, { passive: false });
+
+achievementHolderBackground = Entity(enabled=false,color=color.gray,scale_y=9999)
+
+maxAchievements = Text(enabled=false,text='ph',y=.45,color=color.light_gray, padding=.25)
+maxAchievements.fit_to_text()
+
+
+returnButton = Button(enabled=false,color=color.light_gray,text='RETURN',padding=.15, x=-.75,y=.44)
+returnButton.fit_to_text()
+returnButton.on_click = def():
+    for e in achievementElements:
+        e.enabled = false
+
+    for e in achievements:
+        destroy(e)
+
+    unlockedAchievements = 0
+    currentY = .44
+
+    for e in mainGameElements:
+        e.enabled = true
+
+    autoClicker.alpha = 1
+
+    if localStorage.getItem('backgroundEnabled') === 'true':
+        backgroundToggle.svg = 'bgEnabled.svg'
+        background.enabled = true
+    else:
+        backgroundToggle.svg = 'bgDisabled.svg'
+        background.enabled = false
+
+achievementElements.append(returnButton)
+achievementElements.append(maxAchievements)
+achievementElements.append(achievementHolderBackground)
+achievementElements.append(achievementHolder)
+
 game = new GameLogic(data)
 
-#loadScreen("game")
+#loadScreen("achievements")
 </script>
     <script src="/taptapir/sunsnake_compiler.js"></script>
 </body>

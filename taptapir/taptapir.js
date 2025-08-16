@@ -1724,24 +1724,6 @@ document.addEventListener('keydown', _input)
 document.addEventListener('keyup', _input)
 document.addEventListener('wheel', _input); // modern desktop
 
-
-// triple click in the lower right to enter fullscreen
-_hidden_fullscreen_button = new Button({parent:camera.ui, xy:bottom_right, roundness:.5, color:color.red, last_pressed_timestamp:-1, sequential_taps:0, visible_self:false})
-_hidden_fullscreen_button.on_click = function() {
-    // print(time - _hidden_fullscreen_button.last_pressed_timestamp)
-    if (time - _hidden_fullscreen_button.last_pressed_timestamp < .25) {
-        _hidden_fullscreen_button.sequential_taps += 1
-        if (_hidden_fullscreen_button.sequential_taps >= 3) {
-            set_fullscreen(!fullscreen)
-            _hidden_fullscreen_button.sequential_taps = 0
-        }
-    }
-    else {  //reset
-        _hidden_fullscreen_button.sequential_taps = 1
-    }
-    _hidden_fullscreen_button.last_pressed_timestamp = time
-}
-
 function _fullscreenchange() {
     set_scale(1)
 }

@@ -58,6 +58,7 @@ class GameLogic {
         this.firstLoadClicks = true
         this.firstLoadScore = true
         this.achievementCounter = 5
+        this.offlineAmount = 0
         if (data) {
             data = JSON.parse(data)
             this.saveVersion = parseFloat(data["saveVersion"],10)
@@ -71,6 +72,7 @@ class GameLogic {
             this.achievements = data["achievements"]
             this.upgrades = data["upgrades"]
             this.totalScore = parseInt(data["totalScore"],10)
+            this.lastOnline = parseFloat(data["lastOnline"], 10)
             this.score = parseInt(data["score"],10);
             this.clicks = parseInt(data["clicks"],10)
             this.generatorData = data["generatorData"] || {}
@@ -89,7 +91,7 @@ class GameLogic {
                 window._saveIntervalSet = true
                 setInterval(() => this.saveGame(), 2500);
             }
-            console.log('[GameLogic] Loaded. generateAmount =', this.generateAmount, 'generatorData =', this.generatorData)
+            this.calcOfflineEarn()
         } else { //First time playing or they deleted their data or summin
             this.milestones = {
                 "achieved50Clicks" : false,
@@ -102,6 +104,7 @@ class GameLogic {
             this.totalScore = 0
             this.generatorData = {}
             this.boughtUpgrades = 0
+            this.lastOnline = Math.floor(Date.now() / 1000);
             this.achievements = {
                 "idkJustRandomPlaceHolder" : [false, "", false],
             }
@@ -113,9 +116,28 @@ class GameLogic {
                 window._saveIntervalSet = true
                 setInterval(() => this.saveGame(), 2500);
             }
-            console.log('[GameLogic] Fresh start.') //<--- How sigma does this look
         }
 
+    }
+
+    collectOffline = () => {
+        this.score += this.offlineAmount;
+        this.offlineAmount = 0;
+    }
+
+    calcOfflineEarn = () => {
+        let currentTime = Math.floor(Date.now() / 1000);
+        let timeDiff = currentTime - this.lastOnline;
+        if (timeDiff > 3600) { //1 hour I think
+            if (timeDiff > 115200) {
+                timeDiff = 115200;
+            }
+            const multiplier = .3
+            const amount = (this.generateAmount * timeDiff) * multiplier
+            this.offlineAmount = amount
+            window.showOfflineEarning(amount);
+            this.lastOnline = Math.floor(Date.now() / 1000);
+        }
     }
 
     get clicks() {
@@ -292,6 +314,7 @@ class GameLogic {
             "saveVersion" : this.saveVersion,
             "achievements" : this.achievements,
             "boughtUpgrades" : this.boughtUpgrades,
+            "lastOnline" : Date.now(),
         }
         localStorage.setItem('gameData', JSON.stringify(save))
     }
@@ -360,7 +383,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return response.text();
         })
         .then(data => {
-            console.log("Found data")
             compiled_code = compile(data);
             const run = new Function(compiled_code);
             run();

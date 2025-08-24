@@ -78,6 +78,7 @@ if (!_game_window) {
     if (!document.body) {
         document.body = document.createElement('body')
     }
+    _game_window.style.backgroundColor = 'rgb(23,23,23)'
     document.body.appendChild(_game_window)
 }
 scene = document.createElement('entity')
@@ -90,7 +91,7 @@ _game_window.appendChild(scene)
 is_mobile = 'ontouchstart' in document.documentElement
 fullscreen = false
 camera = null
-ASPECT_RATIO = 9/16
+ASPECT_RATIO = 16/9
 
 function set_orientation(value) {
     if (value == 'vertical') {

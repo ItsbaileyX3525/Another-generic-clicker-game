@@ -119,6 +119,11 @@ infoScreenElements.append(infoReturn)
 
 ########## Clicker game stuff ###########
 
+def showOfflineEarning(amount):
+    offlineEarnScreen.enabled = true
+    offlineText2.fit_to_text()
+    offlineText2.text = 'While you\'ve been away, you have earnt\n\n\n<center>' + formatNumber(amount) + ' Clicks!</center>'
+
 def clicks10():
     game.upgrades["scoreDisplay"] = [10, false, "See how much clicks you have"]
     addUpgrade("scoreDisplay", game.upgrades["scoreDisplay"][2], game.upgrades["scoreDisplay"][0])
@@ -317,6 +322,17 @@ achievementButton.on_click = def():
 
     autoClicker.alpha = 0
     loadAchievementDisplay()
+
+offlineEarnScreen = Entity(enabled=false,color=color.gray,parent=camera.ui,scale=[1.1,.9],z=-999,roundness=.1)
+offlineText = Text(parent=offlineEarnScreen,y=.45, text='Welcome back!')
+offlineText.fit_to_text()
+offlineText2 = Text(parent=offlineEarnScreen,y=.18,text='While you\'ve been away, you have earnt\n\n\n<center>51.32M Clicks!</center>')
+offlineText2.fit_to_text()
+offlineCollect = Button(parent=offlineEarnScreen,padding=.4,y=-.15, text='COLLECT', color=color.green)
+offlineCollect.fit_to_text()
+offlineCollect.on_click = def():
+    offlineEarnScreen.enabled = false
+    game.collectOffline()
 
 #Shocking how hard this was to make
 autoClickerMaxX = -.146
@@ -680,4 +696,4 @@ achievementElements.append(achievementHolder)
 
 game = new GameLogic(data)
 
-#loadScreen("achievements")
+loadScreen("game")

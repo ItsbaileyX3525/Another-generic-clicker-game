@@ -1,17 +1,46 @@
-# Another generic clicker game
+# Another Generic Clicker Game (AGCG)
 
-It is what it is, it's just another generic clicker game that you can play for clicks and score and buy more upgrades to get more clicks and score and so on so forth.
+A clicker game built with the taptapir game engine, featuring incremental gameplay mechanics and achievement systems.
 
-### I know your secretes 
+## Current Features
 
-What secrets this game literally it just a clicker game there is nothing more to it...
+### Core Gameplay
+- Click-based point generation system
+- Score tracking and display
+- Persistent save/load functionality
+- Background music and sound effects
 
-I'm actually not joking...
+### Upgrades System
+- Dynamic upgrade unlocking based on milestones
+- Score display upgrade
+- Click animations and visual effects
+- Particle effects for clicks
+- Critical click system (4x multiplier)
+- Auto-clicker functionality
+- Click power multiplier (10x)
 
-## Why was this hard to make?
+### Generators
+- 6 different generator types with escalating costs and returns
+- Automatic point generation per second
+- Generator price scaling (1.25x multiplier)
+- Persistent generator state
 
-The game is hard to make due to taptapir (the game engine I used) not being the best, a lot of the logic I had to write myself but nevertheless I pulled through, below you can a snippet of what the code looks like.
+### Achievements
+- Achievement notification system
+- Cool vs normal achievement types
+- Achievement viewing screen
+- Progress tracking
 
-![image](https://flik.host/images/2dFCo3.png)
+### Visual Features
+- Customizable background with toggle
+- Particle effects
+- Click animations
+- Achievement toast notifications
+- Scrollable UI elements
 
-Without autocomplete and linting (due to the custom language, its not python, it's python-like) it hindered the development time by a lot but I hope you like it anyways!
+### Audio
+- Click sound effects
+- Achievement unlock sounds
+- Purchase/failure sound effects
+- Background music
+- Save game confirmation sound

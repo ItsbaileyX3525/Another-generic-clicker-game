@@ -65,6 +65,9 @@ input, textarea {
   resize: none;
   color: inherit;
 }
+a {
+    pointer-events: auto;
+}
 `
 document.head.append(style)
 
@@ -107,6 +110,7 @@ function set_orientation(value) {
 // set_orientation
 function set_aspect_ratio(_aspect_ratio) {
     ASPECT_RATIO = _aspect_ratio
+    //print('set aspect ratio to:', _aspect_ratio)
     var width = window.innerWidth
     var height = window.innerHeight
     browser_aspect_ratio = width / height
@@ -116,11 +120,14 @@ function set_aspect_ratio(_aspect_ratio) {
         asp_x = 1
         asp_y = ASPECT_RATIO
         aspect_ratio = 1/ASPECT_RATIO
+        //print(browser_aspect_ratio, aspect_ratio)
         if (browser_aspect_ratio > ASPECT_RATIO) { // if the screen is wider than the game, like a pc monitor.
+            //print('vertical view on wide screen (probably pc)')
             _game_window.style.width = `${width*scale/browser_aspect_ratio*ASPECT_RATIO}px`
             _game_window.style.height =  `${height*scale}px`
         }
         else {                              // if the screen is taller than the game, like a phone screen.
+            //print('vertical view on talls screen (probably mobile)', width, width/ASPECT_RATIO, height)
             _game_window.style.height = `${width/ASPECT_RATIO*scale}px`
             _game_window.style.width =  `${width*scale}px`
         }
@@ -381,6 +388,7 @@ class Entity {
         this.y = 0
         this.z = 0
         this.scale = [1,1]
+        this.origin = [0,0]
         this.rotation = 0
         this.draggable = false
         this.dragging = false
@@ -519,6 +527,12 @@ class Entity {
         this.scale_x = value[0]
         this.scale_y = value[1]
     }
+    get model_scale() {return this._model_scale}
+    set model_scale(value) {
+        this._model_scale = value
+        this.update_model_transform()
+    }
+
     get x() {return this._x}
     set x(value) {
         this.el.style.left = `${50+(value*100)}%`
@@ -555,6 +569,11 @@ class Entity {
     set origin(value) {
         this.model.style.transform = `translate(${(-value[0]-.5)*100}%, ${(value[1]-.5)*100}%)`
         this._origin = value
+        this.update_model_transform()
+    }
+
+    update_model_transform() {
+        this.model.style.transform = `translate(${(-this._origin[0]-.5)*100}%, ${(this._origin[1]-.5)*100}%) scale(${this._model_scale})`
     }
     get rotation() {return this._rotation}
     set rotation(value) {
@@ -584,6 +603,7 @@ class Entity {
             if (!name.includes('.')) {
                 var jpg_image = new Image();
                 jpg_image.onload = () => {
+                    //print(`${name}.jpg exists`)
                     this.texture = `${name}.jpg`
                     return
                 }
@@ -1304,7 +1324,10 @@ function _handle_mouse_click(e) {
                 mouse.click_animation_entity.xy = mouse.position
                 mouse.click_animation_entity.enabled = True
                 mouse.click_animation_entity.texture = mouse.click_animation
+                //print('play click anim')
             }
+            entity.model_scale = .98
+            after(.05, () => {entity.model_scale = 1})
         }
         if (entity.draggable) {
             window_position = _game_window.getBoundingClientRect()
@@ -1341,18 +1364,25 @@ document.addEventListener('mouseup', (event) => {
     else if (event.button == 2) {key = 'right mouse up';  mouse.right=false;  held_keys['mouse right']=false}
     _input(key)
 })
-document.addEventListener('touchend', () => {
-    key = 'left mouse up'; mouse.left=false; held_keys['mouse left']=false
+document.addEventListener('touchend', (event) => {
+    event.preventDefault(); // prevent synthetic mouse events
+    key = 'left mouse up'
+    mouse.left=false
+    held_keys['mouse left'] = false
     _input('left mouse up')
-})
+}, { passive: false })
 // document.addEventListener('touchcancel', (event) => {
 //     print(event)
 //     // event = event.touches[0]
 //     key = 'left mouse up'; mouse.left=false; held_keys['mouse left']=false
 //     _input('left mouse up')
 // })
-/* disable right click */
-document.addEventListener('contextmenu', event => event.preventDefault());
+/* disable right click unless Ctrl is held */
+document.addEventListener('contextmenu', event => {
+    if (!event.ctrlKey) {
+      event.preventDefault();
+    }
+  });
 
 function _update_mouse_position(x, y, pressure) {
     window_position = _game_window.getBoundingClientRect()
@@ -1458,6 +1488,7 @@ mouse.update = () => {      // simulate pointermove. can for example be used to 
 //
 // }
 function Video(options) {
+    //print('----------------------', options)
     settings = {visible_self:false, on_enter:null, on_exit:null, enabled:false, texture:null}
     for (const [key, value] of Object.entries(options)) {
         settings[key] = value
@@ -1718,6 +1749,19 @@ function _input(event) {
                 _input('swipe down')
             }
         }
+    }
+
+}
+
+// debugging tool to show name of entity
+_entity_finder = new Entity({scale:[.45,.05], color:color.azure, y:-.5, z:-100, origin:[0,-.5], text:'entity_finder', text_origin:[0,0], roundess:.25, text_color:color.white, visible_self:false})
+_entity_finder.input = function _(key) {
+    if (held_keys['control'] && key === 'left mouse down' && mouse.hovered_entity) {
+        _entity_finder.visible_self = true
+        _entity_finder.text = mouse.hovered_entity.name
+    }
+    else if (key === 'left mouse up') {
+        _entity_finder.visible_self = false
     }
 }
 document.addEventListener('keydown', _input)

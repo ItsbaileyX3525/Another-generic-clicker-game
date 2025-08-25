@@ -119,6 +119,8 @@ infoScreenElements.append(infoReturn)
 
 ########## Clicker game stuff ###########
 
+globalClickerMultiplier = 1;
+
 def showOfflineEarning(amount):
     offlineEarnScreen.enabled = true
     offlineText2.fit_to_text()
@@ -144,8 +146,12 @@ def clicks350():
     game.upgrades["autoClicker"] = [900, false, "Be lazy, auto click!"]
     addUpgrade("autoClicker", game.upgrades["autoClicker"][2], game.upgrades["autoClicker"][0])
 
+def clicks500():
+    game.upgrades["comboBar"] = [2000, false, "Click faster, get better combos!"]
+    addUpgrade("comboBar", game.upgrades["comboBar"][2], game.upgrades["comboBar"][0])
+
 def clicks1250():
-    game.upgrades["clickPower"] = [5000, false, "Increase your click power tenfold!"]
+    game.upgrades["clickPower"] = [4500, false, "Increase your click power tenfold!"]
     addUpgrade("clickPower", game.upgrades["clickPower"][2], game.upgrades["clickPower"][0])
     prevClickAmount = 20
 
@@ -198,7 +204,12 @@ def loadUpgrades():
     if game.upgrades["achievementsButton"] and game.upgrades["achievementsButton"][1]:
         achievementButton.enabled = true
         mainGameElements.append(achievementButton)
-        
+    if game.upgrades["comboBar"] and game.upgrades["comboBar"][1]:
+        comboBar.enabled = true
+        comboBarText.enabled = true
+        mainGameElements.append(comboBar)
+        mainGameElements.append(comboBarText)
+
 def addUpgrade(upgrade, description, cost, skipDuplicateCheck = false):
     if not skipDuplicateCheck:
         for activeUpg in activeUpgrades:
@@ -235,6 +246,15 @@ mouseTooltip.update = def():
     mouseTooltip.y = mouse.y +.08
     mouseTooltip.fit_to_text()
 
+def createSaveText():
+    saveT = Text(name='test',text='Game saved successfully', text_color=color.green,y=-.44,x=.02)
+    saveT.fit_to_text()
+    saveT.animate("y", -.32, duartion=.4)
+
+    after .6:
+        destroy(saveT)
+
+
 saveGameButton = Button(texture = 'save.svg', y=.3, scale = .12, color=color.gray, y=.43,x=.8, enabled=false)
 saveGameButton.on_click = def():
     if not saveGameButton.disabled:
@@ -245,12 +265,7 @@ saveGameButton.on_click = def():
         after .6:
             saveGameButton.disabled = false
         
-        t = Text(text='Game saved successfully', text_color=color.green,y=-.44,x=.02)
-        t.fit_to_text()
-        t.animate("y", -.32, duartion=.4)
-
-        after .6:
-            destroy(t)
+        createSaveText()
 
 scoreText = Text(text = 'Clicks: 0', text_color=color.light_gray, y=.43, enabled=false)
 scoreText.fit_to_text()
@@ -273,11 +288,26 @@ def showParticle(amount, isCrit):
     particle.animate('y', -.1, duration = 2, curve=curves.out_expo)
     destroyParticle(particle)
 
+cpsCounter = 0
+def cps():
+    cpsCounter += 1
+    after 1:
+        cpsCounter -= 1
+
+def decrease_bar():
+    comboBar.value -= .05 * globalClickerMultiplier
+
+def increase_bar():
+    comboBar.value += 1
+
 prevClickAmount = parseInt(localStorage.getItem('clickAmount'), 10) || 0
 
 clickToEarn = Button(y=.07,enabled = false)  
 clickToEarn.on_click = def():
     clickSound()
+    cps()
+    increase_bar()
+    clicksHave += 1
     randChance = 0
     multiplier = 1
     amount = 0
@@ -294,17 +324,17 @@ clickToEarn.on_click = def():
         if Object.hasOwn(game.upgrades, "clickPower") and game.upgrades["clickPower"][1]:
             localStorage.setItem('clickAmount', 20)
             prevClickAmount = 20
-            amount = 20 * multiplier
+            amount = 20 * multiplier * globalClickerMultiplier
             game.score += amount
         else:
             localStorage.setItem('clickAmount', 2)
             prevClickAmount = 2
-            amount = 2 * multiplier
+            amount = 2 * multiplier * globalClickerMultiplier
             game.score += amount
     else:
         localStorage.setItem('clickAmount', 1)
         prevClickAmount = 1
-        amount = 1 * multiplier
+        amount = 1 * multiplier * globalClickerMultiplier
         game.score += amount
 
     
@@ -322,6 +352,69 @@ achievementButton.on_click = def():
 
     autoClicker.alpha = 0
     loadAchievementDisplay()
+
+beatTimer = 1.5
+beating = false
+
+def comboBeat():
+    if not beating:
+        after .2:
+            comboBeat()
+        return
+    if beatTimer < .8:
+        comboBarText.animate('text_size', 3.3, duration=.1)
+        comboBarText.animate('text_size', 3.3, duration=.1)
+    else:
+        comboBarText.animate('text_size', 3.1, duration=.1)
+        comboBarText.animate('text_size', 3.1, duration=.1)
+    after .1:
+        comboBarText.animate('text_size', 3, duration=beatTimer)
+        comboBarText.animate('text_size', 3, duration=beatTimer)
+        after beatTimer:
+            comboBeat()
+
+comboBarText = Text(enabled=false,text='1x',text_color=color.light_gray,color=color.black,text_size=3,padding=.2,roundness=.02,y=-.23)
+comboBarText.fit_to_text()
+comboBar = HealthBar(enabled=false,bar_color=color.orange,roundness=.2,parent=camera.ui,text_size=0, scale=[.5,.04],y=-.3)
+comboBar.value = 0
+comboBeat()
+
+lastTimeCombo = getPerformance();
+clicksNeededToIncrease = 25
+clicksHave = 0
+
+comboInterval = 1.0 / 60
+comboTimer = 0
+
+comboDelta = 0
+combo = Entity(scale=0,y=999)
+combo.update = def():
+    if clicksHave >= clicksNeededToIncrease:
+        clicksNeededToIncrease *= 1.18
+        globalClickerMultiplier += 1
+        clicksHave = 0
+        comboBarText.text = String(globalClickerMultiplier) + "x"
+        if beatTimer > .4:
+            beatTimer -= .3
+
+    if comboBar.value <= 0:
+        beating = false
+        globalClickerMultiplier = 1
+        beatTimer = 1.5
+        clicksNeededToIncrease = 25
+        clicksHave = 0
+        comboBarText.text = String(globalClickerMultiplier) + "x"
+
+    else:
+        beating = true
+
+    if comboBar.enabled:
+        comboDelta = getDeltaCombo()
+
+        comboTimer += comboDelta
+        if comboTimer >= comboInterval:
+            decrease_bar()
+            comboTimer = 0
 
 offlineEarnScreen = Entity(enabled=false,color=color.gray,parent=camera.ui,scale=[1.1,.9],z=-999,roundness=.1)
 offlineText = Text(parent=offlineEarnScreen,y=.45, text='Welcome back!')
@@ -341,8 +434,6 @@ autoClickInterval = 1.0 / 3.5
 autoClickTimer = 0
 
 lastTime = getPerformance();
-delta = 0
-calc = 0
 
 def click():
     autoClicker.animate("x", autoClickerMaxX, duration = autoClickInterval/2, curve=curves.in_out_expo)
@@ -369,11 +460,13 @@ def click():
         autoClicker.animate("x", autoClickerMinX, duration = autoClickInterval/2, curve=curves.in_out_expo)
 
 autoClicker = Entity(enabled=false,parent=camera.ui,texture='cursorClick.svg',scale=.1, x=-.19,y=.05,rotation=90)
+autoClickDelta = 0
 autoClicker.update = def():
-    if autoClicker.enabled:
-        delta = getDelta()
 
-        autoClickTimer += delta
+    if autoClicker.enabled:
+        autoClickDelta = getDelta()
+
+        autoClickTimer += autoClickDelta
         if autoClickTimer >= autoClickInterval:
             click()
             autoClickTimer = 0
@@ -696,4 +789,4 @@ achievementElements.append(achievementHolder)
 
 game = new GameLogic(data)
 
-loadScreen("game")
+#loadScreen("game")

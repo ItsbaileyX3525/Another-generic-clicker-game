@@ -140,6 +140,11 @@ class GameLogic {
         }
     }
 
+    cheat = () => {
+        this.clicks = 6000
+        this.score = 9000
+    }
+
     get clicks() {
         return this._clicks
     }
@@ -167,6 +172,10 @@ class GameLogic {
         if (this.clicks >= 350 && !this.milestones["achieved350Clicks"]) {
             this.milestones["achieved350Clicks"] = true
             window.clicks350()
+        }
+        if (this.clicks >= 500 && !this.milestones["achieved500Clicks"]) {
+            this.milestones["achieved500Clicks"] = true
+            window.clicks500()
         }
         if (this.clicks >= 1250 && !this.milestones["achieved1250Clicks"]) {
             this.milestones["achieved1250Clicks"] = true
@@ -363,11 +372,19 @@ function getPerformance() {
 }
 
 function getDelta() {
-    calc = getPerformance() - lastTime
-	delta = calc / 1000
-	lastTime = getPerformance()
-    return delta
+    const now = getPerformance()
+    const deltaSeconds = (now - lastTime) / 1000
+    lastTime = now
+    return deltaSeconds
 }
+
+function getDeltaCombo() {
+    const now = getPerformance()
+    const deltaSeconds = (now - lastTime) / 1000
+    lastTimeCombo = now
+    return deltaSeconds
+}
+
 
 </script>
 <script src="/taptapir/taptapir.js"></script>

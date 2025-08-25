@@ -1,6 +1,6 @@
 ### Advanced Clicking Mechanics
-- [ ] Multi-click combos with increasing multipliers
-- [ ] Click streak counters
+- [x] Multi-click combos with increasing multipliers
+- [x] Click streak counters
 - [ ] Different click types (left, right, double)
 - [ ] Click accuracy mini-games
 - [ ] Timed clicking challenges
@@ -10,7 +10,7 @@
 - [ ] Generator upgrades and efficiency improvements
 - [ ] Prestige system for generators
 - [ ] Generator synergy bonuses
-- [ ] Offline earnings calculation
+- [x] Offline earnings calculation
 - [ ] Generator automation levels
 - [ ] Generator visual representations
 

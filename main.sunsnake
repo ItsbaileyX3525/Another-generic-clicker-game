@@ -11,6 +11,7 @@ activeUpgrades = []
 storedUpgrades = []
 achievementElements = []
 achievements = []
+powerups = []
 
 ######## Main menu stuff ############
 
@@ -120,6 +121,7 @@ infoScreenElements.append(infoReturn)
 ########## Clicker game stuff ###########
 
 globalClickerMultiplier = 1;
+powerupClickMultiplier = 1;
 
 def showOfflineEarning(amount):
     offlineEarnScreen.enabled = true
@@ -171,8 +173,12 @@ def score1200():
     game.upgrades["removeBackground"] = [1500, false, "Create a button to turn\noff the background!"]
     addUpgrade("removeBackground", game.upgrades["removeBackground"][2], game.upgrades["removeBackground"][0])
 
+def score2300():
+    game.upgrades["powerUps"] = [3100, false, "Spawn powerups for cool boosts!"]
+    addUpgrade("powerUps", game.upgrades["powerUps"][2], game.upgrades["powerUps"][0])
+
 def score3500():
-    game.upgrades["achievementsButton"] = [4000, false, "See all your cool achievements!"]
+    game.upgrades["achievementsButton"] = [4500, false, "See all your cool achievements!"]
     addUpgrade("achievementsButton", game.upgrades["achievementsButton"][2], game.upgrades["achievementsButton"][0])
 
 
@@ -209,6 +215,10 @@ def loadUpgrades():
         comboBarText.enabled = true
         mainGameElements.append(comboBar)
         mainGameElements.append(comboBarText)
+        comboBeat()
+    if game.upgrades["powerUps"] and game.upgrades["powerUps"][1]:
+        after randomInt(4,10):
+            createPowerup()
 
 def addUpgrade(upgrade, description, cost, skipDuplicateCheck = false):
     if not skipDuplicateCheck:
@@ -295,7 +305,7 @@ def cps():
         cpsCounter -= 1
 
 def decrease_bar():
-    comboBar.value -= .05 * globalClickerMultiplier
+    comboBar.value -= .05 * (globalClickerMultiplier - .5)
 
 def increase_bar():
     comboBar.value += 1
@@ -324,17 +334,17 @@ clickToEarn.on_click = def():
         if Object.hasOwn(game.upgrades, "clickPower") and game.upgrades["clickPower"][1]:
             localStorage.setItem('clickAmount', 20)
             prevClickAmount = 20
-            amount = 20 * multiplier * globalClickerMultiplier
+            amount = 20 * multiplier * powerupClickMultiplier * globalClickerMultiplier
             game.score += amount
         else:
             localStorage.setItem('clickAmount', 2)
             prevClickAmount = 2
-            amount = 2 * multiplier * globalClickerMultiplier
+            amount = 2 * multiplier * powerupClickMultiplier * globalClickerMultiplier
             game.score += amount
     else:
         localStorage.setItem('clickAmount', 1)
         prevClickAmount = 1
-        amount = 1 * multiplier * globalClickerMultiplier
+        amount = 1 * multiplier * powerupClickMultiplier * globalClickerMultiplier
         game.score += amount
 
     
@@ -349,6 +359,8 @@ achievementButton.on_click = def():
         e.enabled = false
     for e in achievementElements:
         e.enabled = true
+    for e in powerups:
+        destroy(e)
 
     autoClicker.alpha = 0
     loadAchievementDisplay()
@@ -361,12 +373,22 @@ def comboBeat():
         after .2:
             comboBeat()
         return
-    if beatTimer < .8:
+    print(beatTimer)
+    if beatTimer < .5:
+        print("Fast")
         comboBarText.animate('text_size', 3.3, duration=.1)
         comboBarText.animate('text_size', 3.3, duration=.1)
+        backgroundMusic.playbackRate = 1.3
+    elif beatTimer < .8:
+        print("Medium")
+        comboBarText.animate('text_size', 3.3, duration=.1)
+        comboBarText.animate('text_size', 3.3, duration=.1)
+        backgroundMusic.playbackRate = 1.2
     else:
+        print("Slowest")
         comboBarText.animate('text_size', 3.1, duration=.1)
         comboBarText.animate('text_size', 3.1, duration=.1)
+        backgroundMusic.playbackRate = 1.1 
     after .1:
         comboBarText.animate('text_size', 3, duration=beatTimer)
         comboBarText.animate('text_size', 3, duration=beatTimer)
@@ -377,7 +399,6 @@ comboBarText = Text(enabled=false,text='1x',text_color=color.light_gray,color=co
 comboBarText.fit_to_text()
 comboBar = HealthBar(enabled=false,bar_color=color.orange,roundness=.2,parent=camera.ui,text_size=0, scale=[.5,.04],y=-.3)
 comboBar.value = 0
-comboBeat()
 
 lastTimeCombo = getPerformance();
 clicksNeededToIncrease = 25
@@ -389,32 +410,44 @@ comboTimer = 0
 comboDelta = 0
 combo = Entity(scale=0,y=999)
 combo.update = def():
-    if clicksHave >= clicksNeededToIncrease:
-        clicksNeededToIncrease *= 1.18
-        globalClickerMultiplier += 1
-        clicksHave = 0
-        comboBarText.text = String(globalClickerMultiplier) + "x"
-        if beatTimer > .4:
-            beatTimer -= .3
+    if comboBar.enabled:
+        if clicksHave >= clicksNeededToIncrease:
+            clicksNeededToIncrease *= 1.18
+            globalClickerMultiplier += 1
+            clicksHave = 0
+            comboBarText.text = String(globalClickerMultiplier) + "x"
+            if beatTimer > .4:
+                beatTimer -= .3
 
-    if comboBar.value <= 0:
+        if comboBar.value <= 0:
+            beating = false
+            globalClickerMultiplier = 1
+            beatTimer = 1.5
+            clicksNeededToIncrease = 25
+            clicksHave = 0
+            backgroundMusic.playbackRate = 1
+            comboBarText.text = String(globalClickerMultiplier) + "x"
+
+        else:
+            beating = true
+
+        if comboBar.enabled:
+            comboDelta = getDeltaCombo()
+
+            comboTimer += comboDelta
+            if comboTimer >= comboInterval:
+                decrease_bar()
+                comboTimer = 0
+    else:
+        print("Disabled")
         beating = false
         globalClickerMultiplier = 1
         beatTimer = 1.5
         clicksNeededToIncrease = 25
         clicksHave = 0
+        backgroundMusic.playbackRate = 1
         comboBarText.text = String(globalClickerMultiplier) + "x"
 
-    else:
-        beating = true
-
-    if comboBar.enabled:
-        comboDelta = getDeltaCombo()
-
-        comboTimer += comboDelta
-        if comboTimer >= comboInterval:
-            decrease_bar()
-            comboTimer = 0
 
 offlineEarnScreen = Entity(enabled=false,color=color.gray,parent=camera.ui,scale=[1.1,.9],z=-999,roundness=.1)
 offlineText = Text(parent=offlineEarnScreen,y=.45, text='Welcome back!')
@@ -471,6 +504,65 @@ autoClicker.update = def():
             click()
             autoClickTimer = 0
 
+clickPowerup = false
+genSpeedPowerup = false
+
+def associateClick(button, type):
+    powerups.append(button)
+    if type == "click":
+        button.on_click = def():
+            if clickPowerup:
+                destroy(button)
+                powerups = powerups.filter(item => item !== button);
+                return
+            console.log("Clicked, increase click power")
+            powerupClickMultiplier = 1.75;
+            clickPowerup = true
+            after 7:
+                powerupClickMultiplier = 1
+                clickPowerup = false
+            destroy(button)
+            powerups = powerups.filter(item => item !== button);
+    elif type == 'gens':
+
+        button.on_click = def():
+            if genSpeedPowerup:
+                destroy(button)
+                powerups = powerups.filter(item => item !== button);
+                return
+            console.log("Clicked, decrease generator time")
+            window.setGenInterval(250)
+            genSpeedupSound.play()
+            genSpeedPowerup = true
+            createVHSLines(11000)
+            after 10:
+                window.setGenInterval(1000)
+                genSpeedPowerup = false
+            destroy(button)
+            powerups = powerups.filter(item => item !== button);
+
+    
+
+def createPowerup():
+    if len(powerups) > 2:
+        after randomInt(8,30):
+            createPowerup()
+        return
+    pwrupX = randomInt(-7,7) / 10
+    pwrupY = randomInt(-4,4) / 10
+    randomPwrup = randomInt(0,1)
+    if randomPwrup == 0:
+        pwrup = Button(text='click',padding=.2, color=color.black,text_color=color.white,x=pwrupX, y=pwrupY)
+        pwrup.fit_to_text()
+        associateClick(pwrup, "click")
+
+    elif randomPwrup == 1:
+        pwrup = Button(text='gens',padding=.2, color=color.black,text_color=color.white,x=pwrupX, y=pwrupY)
+        pwrup.fit_to_text()
+        associateClick(pwrup, "gens")
+
+    after randomInt(12,38):
+        createPowerup()
 
 upgradeHolder = Entity(parent=camera.ui, color=color.clear)
 
@@ -501,6 +593,8 @@ generatorButton.on_click = def():
     autoClicker.alpha = 0
     for e in generatorElements:
         e.enabled = true
+    for e in powerups:
+        destroy(e)
 
 generatorButton.fit_to_text()
 

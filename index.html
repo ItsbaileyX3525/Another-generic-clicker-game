@@ -30,9 +30,160 @@ achievementEarnSound.volume = .4
 let achievementEarnSoundBetter = new Audio('/assets/AchievementGotBest.mp3')
 achievementEarnSoundBetter.volume = .4
 
+let genSpeedupSound = new Audio('/assets/speedup.mp3')
+genSpeedupSound.volume = .4
+
 let saveGameSFX = new Audio('/assets/save.mp3')
 let purchaseUpgradeSFX = new Audio('/assets/purchase.mp3')
 let purchaseUpgradeFailSFX = new Audio('/assets/purchaseFail.mp3')
+
+function createVHSLines(duration = 2000) {
+    // Create top scan lines
+    const topLines = document.createElement('div');
+    topLines.style.cssText = `
+        position: fixed;
+        top: 5%;
+        left: 0;
+        width: 100%;
+        height: 80px;
+        background: 
+            repeating-linear-gradient(
+                0deg,
+                transparent 0px,
+                rgba(255, 255, 255, 0.9) 1px,
+                rgba(255, 255, 255, 0.6) 2px,
+                transparent 3px,
+                transparent 5px
+            ),
+            linear-gradient(
+                90deg,
+                rgba(255, 255, 255, 0.1) 0%,
+                rgba(255, 255, 255, 0.3) 50%,
+                rgba(255, 255, 255, 0.1) 100%
+            );
+        z-index: 9999;
+        pointer-events: none;
+        opacity: 0.8;
+        animation: vhsTracking 0.03s infinite, vhsShake 0.1s infinite;
+    `;
+
+    // Create bottom scan lines
+    const bottomLines = document.createElement('div');
+    bottomLines.style.cssText = `
+        position: fixed;
+        bottom: 5%;
+        left: 0;
+        width: 100%;
+        height: 80px;
+        background: 
+            repeating-linear-gradient(
+                0deg,
+                transparent 0px,
+                rgba(255, 255, 255, 0.9) 1px,
+                rgba(255, 255, 255, 0.6) 2px,
+                transparent 3px,
+                transparent 5px
+            ),
+            linear-gradient(
+                90deg,
+                rgba(255, 255, 255, 0.1) 0%,
+                rgba(255, 255, 255, 0.3) 50%,
+                rgba(255, 255, 255, 0.1) 100%
+            );
+        z-index: 9999;
+        pointer-events: none;
+        opacity: 0.8;
+        animation: vhsTracking 0.03s infinite, vhsShake 0.1s infinite;
+    `;
+
+    // Create CSS animation if it doesn't exist
+    if (!document.getElementById('vhs-animation-styles')) {
+        const style = document.createElement('style');
+        style.id = 'vhs-animation-styles';
+        style.textContent = `
+            @keyframes vhsTracking {
+                0% { 
+                    opacity: 0.8; 
+                    transform: translateX(0px) scaleY(1); 
+                    filter: brightness(1) contrast(1);
+                }
+                15% { 
+                    opacity: 0.9; 
+                    transform: translateX(-2px) scaleY(1.1); 
+                    filter: brightness(1.2) contrast(1.3);
+                }
+                30% { 
+                    opacity: 0.6; 
+                    transform: translateX(3px) scaleY(0.9); 
+                    filter: brightness(0.8) contrast(1.5);
+                }
+                45% { 
+                    opacity: 0.9; 
+                    transform: translateX(-1px) scaleY(1.2); 
+                    filter: brightness(1.1) contrast(1.1);
+                }
+                60% { 
+                    opacity: 0.7; 
+                    transform: translateX(4px) scaleY(0.8); 
+                    filter: brightness(1.3) contrast(1.4);
+                }
+                75% { 
+                    opacity: 0.8; 
+                    transform: translateX(-3px) scaleY(1.1); 
+                    filter: brightness(0.9) contrast(1.2);
+                }
+                90% { 
+                    opacity: 0.9; 
+                    transform: translateX(2px) scaleY(1); 
+                    filter: brightness(1.1) contrast(1.3);
+                }
+                100% { 
+                    opacity: 0.8; 
+                    transform: translateX(0px) scaleY(1); 
+                    filter: brightness(1) contrast(1);
+                }
+            }
+            
+            @keyframes vhsShake {
+                0% { transform: translateY(0px); }
+                10% { transform: translateY(-1px); }
+                20% { transform: translateY(1px); }
+                30% { transform: translateY(-2px); }
+                40% { transform: translateY(2px); }
+                50% { transform: translateY(-1px); }
+                60% { transform: translateY(1px); }
+                70% { transform: translateY(-1px); }
+                80% { transform: translateY(2px); }
+                90% { transform: translateY(-1px); }
+                100% { transform: translateY(0px); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Add elements to body
+    document.body.appendChild(topLines);
+    document.body.appendChild(bottomLines);
+
+    // Remove after specified duration
+    setTimeout(() => {
+        if (topLines.parentNode) {
+            topLines.parentNode.removeChild(topLines);
+        }
+        if (bottomLines.parentNode) {
+            bottomLines.parentNode.removeChild(bottomLines);
+        }
+    }, duration);
+
+    return {
+        topLines,
+        bottomLines,
+        remove: () => {
+            if (topLines.parentNode) topLines.parentNode.removeChild(topLines);
+            if (bottomLines.parentNode) bottomLines.parentNode.removeChild(bottomLines);
+        }
+    };
+}
 
 // Format large numbers to human-readable form (e.g., 1.2k, 3.4M) with up to 1 decimal place.
 function formatNumber(value) {
@@ -82,10 +233,21 @@ class GameLogic {
                 this.generateAmount += value[2]
             }
             if (!window._genIntervalSet) {
-                window._genIntervalSet = true
-                setInterval(() => {
+                window._genIntervalSet = true;
+                window.genIntervalMs = window.genIntervalMs || 1000;
+                window._genInterval = setInterval(() => {
                     this.generateScore();
-                }, 1000);
+                }, window.genIntervalMs);
+
+                window.setGenInterval = (ms) => {
+                    window.genIntervalMs = ms;
+                    if (window._genInterval) clearInterval(window._genInterval);
+                    window._genInterval = setInterval(() => {
+                        if (window.game) {
+                            window.game.generateScore();
+                        }
+                    }, window.genIntervalMs);
+                };
             }
             if (!window._saveIntervalSet) {
                 window._saveIntervalSet = true
@@ -213,6 +375,10 @@ class GameLogic {
         if (this.score >= 1200 && !this.milestones["achieved1200Score"]) {
             this.milestones["achieved1200Score"] = true
             window.score1200()
+        }
+        if (this.score >= 2300 && !this.milestones["achieved2300Score"]) {
+            this.milestones["achieved2300Score"] = true
+            window.score2300()
         }
         if (this.score >= 3500 && !this.milestones["achieved3500Score"]) {
             this.milestones["achieved3500Score"] = true
@@ -385,6 +551,16 @@ function getDeltaCombo() {
     return deltaSeconds
 }
 
+function randomInt(min, max) {
+	if (typeof min !== "number" || typeof max !== "number") {
+		throw new Error("Both min and max must be numbers");
+	}
+	if (min > max) {
+		throw new Error("Min cannot be greater than max");
+	}
+
+	return Math.floor(Math.random() * (max - min + 1)) + min;
+}
 
 </script>
 <script src="/taptapir/taptapir.js"></script>

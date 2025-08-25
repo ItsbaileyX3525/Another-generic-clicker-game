@@ -4,7 +4,7 @@
 - [ ] Different click types (left, right, double)
 - [ ] Click accuracy mini-games
 - [ ] Timed clicking challenges
-- [ ] Click power-ups with duration timers
+- [x] Click power-ups with duration timers
 
 ### Extended Generator System
 - [ ] Generator upgrades and efficiency improvements
@@ -54,10 +54,10 @@
 - [ ] User-generated content support
 
 ### Mobile Optimizations
-- [ ] Touch gesture support
-- [ ] Haptic feedback
-- [ ] Battery usage optimization
-- [ ] Offline play capabilities
+- [x] Touch gesture support
+- [x] Haptic feedback
+- [x] Battery usage optimization
+- [x] Offline play capabilities
 - [ ] Cloud save synchronization
 
 ### Advanced Game Mechanics
